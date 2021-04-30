@@ -1,0 +1,5 @@
+.env
+
+*.rst
+__pycache__
+.vscode
