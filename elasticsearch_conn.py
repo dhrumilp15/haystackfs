@@ -4,7 +4,7 @@ from elasticsearch.exceptions import ConflictError
 
 
 class ElasticSearchConnector():
-    def __init__(self, elastic_domain: str, elastic_port: str, index: str):
+    def __init__(self, elastic_domain: str, elastic_port: str, index: str = 'file_index'):
         self.es = self.make_connection(elastic_domain, elastic_port)
         self.index = index
         self.create_index()
@@ -26,13 +26,26 @@ class ElasticSearchConnector():
     def check_if_doc_exists(self, file_name: str):
         return self.es.exists(index=self.index, id=file_name)
 
-    def create_doc(self, file_id, file_name, created, ts, mimetype, filetype, uid, size):
+    def create_doc(self, file, message):
+        if self.check_if_doc_exists(file.filename):
+            self.delete_doc(file.filename)
         try:
-            # filename, file_extension = os.path.splitext(file_name)
             body = {
-                "file_id": file_id, "file_name": file_name, "created": str(created), "timestamp": str(ts), "mimetype": mimetype, "filetype": filetype, "user_id": uid, "size": str(size),
+                "author": str(message.author.id),
+                "author_name": message.author.name,
+                "file_id": str(file.id),
+                "file_name": file.filename,
+                "created": str(message.created_at),
+                "mimetype": str(file.content_type),
+                "size": str(file.size),
+                "proxy_url": str(file.proxy_url),
+                "url": str(file.url)
             }
-            self.es.create(index=self.index, id=file_name, body=body)
+            if file.height and file.width:
+                body["height"] = file.height
+                body["width"] = file.width
+
+            self.es.create(index=self.index, id=file.filename, body=body)
             return True
         except ConflictError as err:
             print(f"Error is {err}")
@@ -40,7 +53,7 @@ class ElasticSearchConnector():
 
     def delete_doc(self, file_name):
         """Removes a document from the index"""
-        if(self.check_if_doc_exists(file_name)):
+        if self.check_if_doc_exists(file_name):
             self.es.delete(index=self.index, id=file_name)
 
     def search(self, text: str):

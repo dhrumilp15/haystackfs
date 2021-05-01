@@ -19,27 +19,14 @@ s3_client = boto3.client(
     aws_access_key_id=str(os.getenv('AWS_ACCESS_KEY_ID')),
     aws_secret_access_key=str(os.getenv('AWS_SECRET_ACCESS_KEY'))
 )
-print("Created s3_client")
-response = s3_client.list_objects(
-    Bucket='testbucket',
-    MaxKeys=1,
+
+print(s3_client.list_buckets())
+
+es_client = ElasticSearchConnector(
+    elastic_domain=os.getenv("ELASTIC_DOMAIN"),
+    elastic_port=os.getenv("ELASTIC_PORT"),
+    index='file_index'
 )
-
-print(response)
-
-
-# bukkit = boto3.resource('s3', endpoint_url=os.getenv('ENDPOINT_URL'),
-#                         aws_access_key_id=str(os.getenv('AWS_ACCESS_KEY_ID')),
-#                         aws_secret_access_key=str(
-#                             os.getenv('AWS_SECRET_ACCESS_KEY'))
-#                         )
-
-
-# es_client = ElasticSearchConnector(
-#     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
-#     elastic_port=os.getenv("ELASTIC_PORT"),
-#     index='file_index'
-# )
 
 
 @client.event
@@ -52,10 +39,6 @@ async def on_message(message):
     '''Send all message attachments to the CORTX s3 bucket'''
     if message.author == client.user:
         return
+    await upload_to_s3(s3_client, es_client, message)
 
-    for attachment in message.attachments:
-        print(attachment)
-        await upload_to_s3(s3_client, es_client, attachment, TOKEN)
-
-
-# client.run(TOKEN)
+client.run(TOKEN)
