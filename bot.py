@@ -20,8 +20,6 @@ s3_client = boto3.client(
     aws_secret_access_key=str(os.getenv('AWS_SECRET_ACCESS_KEY'))
 )
 
-print(s3_client.list_buckets())
-
 es_client = ElasticSearchConnector(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
     elastic_port=os.getenv("ELASTIC_PORT"),
@@ -35,10 +33,15 @@ async def on_ready():
 
 
 @client.event
-async def on_message(message):
+async def on_message(message: discord.Message):
     '''Send all message attachments to the CORTX s3 bucket'''
     if message.author == client.user:
         return
+
     await upload_to_s3(s3_client, es_client, message)
+
+    if message.content.startswith('!search') or message.content.startswith('!s'):
+        message.content = ''.join(message.content.split()[1:])
+        print(es_client.search(message.content))
 
 client.run(TOKEN)

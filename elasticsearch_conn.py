@@ -1,6 +1,6 @@
 import json
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConflictError
+from elasticsearch.exceptions import ConflictError, RequestError
 
 
 class ElasticSearchConnector():
@@ -11,17 +11,17 @@ class ElasticSearchConnector():
 
     def make_connection(self, domain: str, port: str):
         try:
-            es = Elasticsearch(domain + ':' + port)
-            print(json.dumps(Elasticsearch.info(es), indent=4))
-            return es
+            return Elasticsearch(domain + ':' + port)
         except Exception as err:
             print(f"Encountered {err}")
             return None
 
     def create_index(self):
-        if not self.es.indices.exists(index=self.index):
+        try:
             self.es.indices.create(index=self.index, body=json.load(
                 open('elasticsearchconfig.json', 'r')))
+        except (ConflictError, RequestError):
+            print("The index has already been created!")
 
     def check_if_doc_exists(self, file_name: str):
         return self.es.exists(index=self.index, id=file_name)
@@ -72,7 +72,7 @@ class ElasticSearchConnector():
                 }
             }
         )
-        # print(result["hits"]["hits"])
+        print(result["hits"]["hits"])
         return result
 
 
