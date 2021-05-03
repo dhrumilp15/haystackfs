@@ -53,10 +53,10 @@ class ElasticSearchConnector():
             except ConflictError as err:
                 print(f"Error is {err}")
 
-    def delete_doc(self, filename):
-        """Removes a document from the index"""
-        if self.check_if_doc_exists(filename):
-            self.ES.delete(index=self.index, id=filename)
+    # def delete_doc(self, filename):
+    #     """Removes a document from the index"""
+    #     if self.check_if_doc_exists(filename):
+    #         self.ES.delete(index=self.index, id=filename)
 
     def search_hash(self, filehash: int):
         query = {
