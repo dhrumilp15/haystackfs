@@ -48,6 +48,9 @@
             "filetype": {
                 "type": "text"
             },
+            "file_hash": {
+                "type": "text"
+            },
             "size": {
                 "type": "text"
             },
