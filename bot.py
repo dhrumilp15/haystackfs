@@ -42,7 +42,7 @@ async def on_message(message):
         return
 
     # since cortx has been terminated, we won't be using it anymore :(
-    es_client.create_doc(message)
+    await es_client.create_doc(message)
 
     if message.content[:7] == '!search' or message.content[:2] == '!s':
         content = ''.join(message.content.split()[1:])
@@ -50,7 +50,6 @@ async def on_message(message):
         await message.channel.send("Found these:")
 
         file_buf = await download(files)
-        print(file_buf)
         await message.channel.send(files=file_buf)
         for buf in file_buf:
             buf.close()
@@ -62,7 +61,7 @@ async def download(files: str):
         url = file['_source']['url']
         response = requests.get(url, stream=True)
         if not response.ok:
-            print(response)
+            print("Response wasn't received")
         file_buf = BytesIO()
         for blk in response.iter_content(1024):
             if not blk:

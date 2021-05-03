@@ -1,4 +1,5 @@
 import json
+import discord
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConflictError
 
@@ -21,56 +22,53 @@ class ElasticSearchConnector():
         self.ES.indices.create(index=self.index, body=json.load(
             open('elasticsearchconfig.json', 'r')))
 
-    def check_if_doc_exists(self, filename):
-        return self.ES.exists(index=self.index, id=filename)
+    def check_if_doc_exists(self, file: discord.Attachment, filehash: int):
+        return self.search_hash(filehash) or self.ES.exists(index=self.index, id=file.id)
 
-    def create_doc(self, message):
+    async def create_doc(self, message):
         for file in message.attachments:
-            print("Attempting to create {}, hash: {}".format(
-                file.filename, hash(file)))
-
+            print("Attempting to create {}".format(file.filename))
+            hashbytes = await file.read()
+            hashbytes = hash(hashbytes)
+            if self.check_if_doc_exists(file=file, filehash=hashbytes):
+                continue
             try:
-                # filename = self.update_duplicate_filename(file.filename)
                 body = {
                     "author": str(message.author.id),
                     "author_name": message.author.name,
                     "file_id": str(file.id),
                     "file_name": file.filename,
+                    "file_hash": str(hashbytes),
                     "created": str(message.created_at),
                     "mimetype": str(file.content_type),
                     "size": str(file.size),
                     "proxy_url": str(file.proxy_url),
-                    "url": str(file.url)
+                    "url": str(file.url),
                 }
                 if file.height and file.width:
                     body["height"] = file.height
                     body["width"] = file.width
+
                 self.ES.create(index=self.index, id=file.id, body=body)
-                return True
             except ConflictError as err:
                 print(f"Error is {err}")
-                return False
 
     def delete_doc(self, filename):
         """Removes a document from the index"""
         if self.check_if_doc_exists(filename):
             self.ES.delete(index=self.index, id=filename)
 
-    def update_duplicate_filename(self, filename):
-        existing_filenames = self.search(filename)
-        if not existing_filenames:
-            return filename
-
-        prev_word = existing_filenames[-1]['_source']['file_name']
-        for idx, char in enumerate(prev_word[::-1]):
-            if char == '_':
-                version = int(prev_word[-idx + 1:])
-                filename += '_' + str(version + 1)
-                return filename
-            if char == '.':
-                break
-
-        return filename + '_1'
+    def search_hash(self, filehash: int):
+        query = {
+            "query": {
+                "match": {
+                    "file_hash": {
+                        "query": str(filehash)
+                    },
+                }
+            }
+        }
+        return self.ES.search(index=self.index, body=query)["hits"]["hits"]
 
     def search(self, filename: str):
         query = {

@@ -1,0 +1,1 @@
+('Store CORtx#6561 has connected to Discord!',)
