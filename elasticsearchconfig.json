@@ -6,16 +6,7 @@
             "analyzer": {
                 "edge_ngram_analyzer": {
                     "type": "custom",
-                    "tokenizer": "edge_ngram_tokenizer",
-                    "filter": [
-                        "lowercase"
-                    ]
-                },
-                "lower_search_analyzer": {
-                    "tokenizer": "standard",
-                    "filter": [
-                        "lowercase"
-                    ]
+                    "tokenizer": "edge_ngram_tokenizer"
                 }
             },
             "tokenizer": {
@@ -25,7 +16,8 @@
                     "max_gram": 10,
                     "token_chars": [
                         "letter",
-                        "digit"
+                        "digit",
+                        "punctuation"
                     ]
                 }
             }
@@ -33,18 +25,21 @@
     },
     "mappings": {
         "properties": {
+            "author": {
+                "type": "text"
+            },
+            "author_name": {
+                "type": "text"
+            },
             "file_name": {
                 "type": "text",
                 "analyzer": "edge_ngram_analyzer",
-                "search_analyzer": "lower_search_analyzer"
+                "search_analyzer": "edge_ngram_analyzer"
             },
             "file_id": {
                 "type": "text"
             },
             "created": {
-                "type": "text"
-            },
-            "timestamp": {
                 "type": "text"
             },
             "mimetype": {
@@ -53,10 +48,19 @@
             "filetype": {
                 "type": "text"
             },
-            "user_id": {
+            "size": {
                 "type": "text"
             },
-            "size": {
+            "proxy_url": {
+                "type": "text"
+            },
+            "url": {
+                "type": "text"
+            },
+            "height": {
+                "type": "text"
+            },
+            "width": {
                 "type": "text"
             }
         }
