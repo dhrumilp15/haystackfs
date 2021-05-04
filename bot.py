@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import requests
 from io import BytesIO
+from typing import List, Dict
 
 import discord
 from dotenv import load_dotenv
@@ -43,57 +44,54 @@ async def on_message(message):
 
     # since cortx has been terminated, we won't be using it anymore :(
     await es_client.create_doc(message)
+    if not message.content:
+        return
+    content = message.content.split()
+    print(content)
+    query = content.pop(0)
+    content = ' '.join(content)
 
-    if message.content[:4] == '!all':
-        all_docs = es_client.get_all_docs()
-        file_buf = await download(all_docs)
-        if file_buf:
-            await message.author.send("All documents:", files=file_buf)
-        else:
-            await message.author.send("The archives are empty...")
-        for buf in file_buf:
-            buf.close()
+    if query == '!all' or query == '!a':
+        await send_files_as_message(message, es_client.get_all_docs(), content)
 
-    if message.content[:7] == '!delete' or message.content[:4] == '!del':
-        content = ''.join(message.content.split()[1:])
+    elif query == '!delete' or query == '!del':
         files = es_client.search(content)
         if not files:
-            await message.author.send("Couldn't find the files to delete")
+            await message.author.send(
+                f"Couldn't delete files related to `{content}`")
             return
-        del_str = ["Deleted"]
+
+        del_str = []
         for file in files:
             es_client.delete_doc(file['_id'])
-            message = await message.channel.fetch_message(file['_source']['message_id'])
+            msg = await message.channel.fetch_message(
+                file['_source']['message_id'])
             try:
-                await message.delete()
+                await msg.delete()
                 del_str.append(file['_source']['file_name'])
             except discord.Forbidden:
-                await message.channel.send("Can't delete {}".format(file['_source']['file_name']))
-        if len(del_str) > 1:
-            await message.author.send(del_str)
+                await message.channel.send(
+                    f"Couldn't delete `{file['_source']['file_name']}`")
+        if del_str:
+            await message.author.send(f"Deleted: `{' '.join(del_str)}`")
 
-    if message.content[:7] == '!remove' or message.content[:3] == '!rm':
-        content = ''.join(message.content.split()[1:])
+    elif query == '!remove' or query == '!rm':
         files = es_client.search(content)
         if not files:
-            await message.author.send("Couldn't find the files to remove")
+            await message.author.send(
+                f"Couldn't remove files related to `{content}`")
             return
+
+        output_filenames = []
         for file in files:
             es_client.delete_doc(file['_id'])
-        await message.author.send("Removed {}".format(' '.join([file['_source']['file_name'] for file in files])))
+            output_filenames.append(file['_source']['file_name'])
+        if output_filenames:
+            await message.author.send(
+                f"Removed: `{' '.join(output_filenames)}`")
 
-    if message.content[:7] == '!search' or message.content[:2] == '!s':
-        content = ''.join(message.content.split()[1:])
-        files = es_client.search(content)
-        await message.channel.send("I'll dm you what I find")
-        if not files:
-            await message.author.send("Couldn't find anything related to `{}` :(".format(content))
-            return
-
-        file_buf = await download(files)
-        await message.author.send("Here's what I found:", files=file_buf)
-        for buf in file_buf:
-            buf.close()
+    elif query == '!search' or query == '!s':
+        await send_files_as_message(message, es_client.search(content), content)
 
 
 @client.event
@@ -111,7 +109,38 @@ async def on_raw_message_delete(payload):
         es_client.delete_doc(file.id)
 
 
-async def download(files: str):
+def check_if_author_can_view_message(author: discord.User,
+                                     message: discord.Message, file: List[Dict]):
+    """Checks if the author can view the file
+
+    Args:
+        author: The discord.User querying for files
+        files: A list of dicts returned from ElasticSearch.
+    """
+    file_message_id = file['_source']['message_id']
+    file_message_chan = message.channel.fetch_message(file_message_id).channel
+
+
+async def send_files_as_message(search_message, files, content):
+    """Sends files to the author of the message
+
+    Args:
+        search_message: The original search message
+        files: The files returned from ElasticSearch
+    """
+    if not files:
+        await search_message.author.send(
+            f"Couldn't find files related to `{content}` :(")
+        return
+    # if search_message.channel
+
+    file_buf = download(files)
+    await search_message.author.send("Here's what I found:", files=file_buf)
+    for buf in file_buf:
+        buf.close()
+
+
+def download(files: str):
     filebufs = []
     for idx, file in enumerate(files):
         url = file['_source']['url']
