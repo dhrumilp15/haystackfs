@@ -41,6 +41,7 @@ class ElasticSearchConnector():
                     "file_hash": str(hashbytes),
                     "created": str(message.created_at),
                     "mimetype": str(file.content_type),
+                    "message_id": str(message.id),
                     "size": str(file.size),
                     "proxy_url": str(file.proxy_url),
                     "url": str(file.url),
@@ -53,10 +54,10 @@ class ElasticSearchConnector():
             except ConflictError as err:
                 print(f"Error is {err}")
 
-    # def delete_doc(self, filename):
-    #     """Removes a document from the index"""
-    #     if self.check_if_doc_exists(filename):
-    #         self.ES.delete(index=self.index, id=filename)
+    def delete_doc(self, file_id):
+        """Removes a document from the index"""
+        if self.ES.exists(index=self.index, id=file_id):
+            self.ES.delete(index=self.index, id=file_id)
 
     def search_hash(self, filehash: int):
         query = {
