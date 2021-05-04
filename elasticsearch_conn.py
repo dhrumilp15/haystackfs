@@ -1,70 +1,93 @@
 import json
+import discord
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConflictError
 
 
 class ElasticSearchConnector():
     def __init__(self, elastic_domain: str, elastic_port: str, index: str = 'file_index'):
-        self.es = self.make_connection(elastic_domain, elastic_port)
+        self.ES = self.make_connection(elastic_domain, elastic_port)
+
         self.index = index
         self.create_index()
 
     def make_connection(self, domain: str, port: str):
         try:
-            es = Elasticsearch(domain + ':' + port)
-            print(json.dumps(Elasticsearch.info(es), indent=4))
-            return es
+            return Elasticsearch(domain + ':' + port)
         except Exception as err:
             print(f"Encountered {err}")
             return None
 
     def create_index(self):
-        if not self.es.indices.exists(index=self.index):
-            self.es.indices.create(index=self.index, body=json.load(
-                open('elasticsearchconfig.json', 'r')))
+        self.ES.indices.delete(index=self.index, ignore=[400, 404])
+        self.ES.indices.create(index=self.index, body=json.load(
+            open('elasticsearchconfig.json', 'r')))
 
-    def check_if_doc_exists(self, file_name: str):
-        return self.es.exists(index=self.index, id=file_name)
+    def check_if_doc_exists(self, file: discord.Attachment, filehash: int):
+        return self.search_hash(filehash) or self.ES.exists(index=self.index, id=file.id)
 
-    def create_doc(self, file, message):
-        if self.check_if_doc_exists(file.filename):
-            self.delete_doc(file.filename)
-        try:
-            body = {
-                "author": str(message.author.id),
-                "author_name": message.author.name,
-                "file_id": str(file.id),
-                "file_name": file.filename,
-                "created": str(message.created_at),
-                "mimetype": str(file.content_type),
-                "size": str(file.size),
-                "proxy_url": str(file.proxy_url),
-                "url": str(file.url)
-            }
-            if file.height and file.width:
-                body["height"] = file.height
-                body["width"] = file.width
+    async def create_doc(self, message):
+        for file in message.attachments:
+            print("Attempting to create {}".format(file.filename))
+            hashbytes = await file.read()
+            hashbytes = hash(hashbytes)
+            if self.check_if_doc_exists(file=file, filehash=hashbytes):
+                continue
+            try:
+                body = {
+                    "author": str(message.author.id),
+                    "author_name": message.author.name,
+                    "file_id": str(file.id),
+                    "file_name": file.filename,
+                    "file_hash": str(hashbytes),
+                    "created": str(message.created_at),
+                    "mimetype": str(file.content_type),
+                    "message_id": str(message.id),
+                    "size": str(file.size),
+                    "proxy_url": str(file.proxy_url),
+                    "url": str(file.url),
+                }
+                if file.height and file.width:
+                    body["height"] = file.height
+                    body["width"] = file.width
 
-            self.es.create(index=self.index, id=file.filename, body=body)
-            return True
-        except ConflictError as err:
-            print(f"Error is {err}")
-            return False
+                self.ES.create(index=self.index, id=file.id, body=body)
+            except ConflictError as err:
+                print(f"Error is {err}")
 
-    def delete_doc(self, file_name):
+    def delete_doc(self, file_id):
         """Removes a document from the index"""
-        if self.check_if_doc_exists(file_name):
-            self.es.delete(index=self.index, id=file_name)
+        if self.ES.exists(index=self.index, id=file_id):
+            self.ES.delete(index=self.index, id=file_id)
 
-    def search(self, text: str):
-        query = {"from": 0, "size": 20, "query": {
-            "match": {"file_name": {"query": text, "operator": "and"}}}}
-        res = self.es.search(index=self.index, body=query)
-        return res["hits"]["hits"]
+    def search_hash(self, filehash: int):
+        query = {
+            "query": {
+                "match": {
+                    "file_hash": {
+                        "query": str(filehash)
+                    },
+                }
+            }
+        }
+        return self.ES.search(index=self.index, body=query)["hits"]["hits"]
+
+    def search(self, filename: str):
+        query = {
+            "query": {
+                "match": {
+                    "file_name": {
+                        "query": filename,
+                        "fuzziness": "AUTO",
+                    }
+                }
+            }
+        }
+        return self.ES.search(index=self.index, body=query)["hits"]["hits"]
 
     def get_all_docs(self):
         """Get all docs in ES"""
-        result = self.es.search(
+        result = self.ES.search(
             index=self.index,
             body={
                 "query": {
@@ -72,9 +95,8 @@ class ElasticSearchConnector():
                 }
             }
         )
-        # print(result["hits"]["hits"])
-        return result
+        return result["hits"]["hits"]
 
 
 if __name__ == '__main__':
-    es = ElasticSearchConnector('http://localhost', '9200', 'file_index')
+    ElasticSearchConnector('http://localhost', '9200', 'file_index')

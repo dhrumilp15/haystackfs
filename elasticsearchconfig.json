@@ -4,25 +4,16 @@
         "number_of_replicas": 0,
         "analysis": {
             "analyzer": {
-                "edge_ngram_analyzer": {
+                "ngram_analyzer": {
                     "type": "custom",
-                    "tokenizer": "edge_ngram_tokenizer",
-                    "filter": [
-                        "lowercase"
-                    ]
-                },
-                "lower_search_analyzer": {
-                    "tokenizer": "standard",
-                    "filter": [
-                        "lowercase"
-                    ]
+                    "tokenizer": "ngram_tokenizer"
                 }
             },
             "tokenizer": {
-                "edge_ngram_tokenizer": {
-                    "type": "edge_ngram",
-                    "min_gram": 2,
-                    "max_gram": 10,
+                "ngram_tokenizer": {
+                    "type": "ngram",
+                    "min_gram": 3,
+                    "max_gram": 3,
                     "token_chars": [
                         "letter",
                         "digit"
@@ -33,10 +24,16 @@
     },
     "mappings": {
         "properties": {
+            "author": {
+                "type": "text"
+            },
+            "author_name": {
+                "type": "text"
+            },
             "file_name": {
                 "type": "text",
-                "analyzer": "edge_ngram_analyzer",
-                "search_analyzer": "lower_search_analyzer"
+                "analyzer": "ngram_analyzer",
+                "search_analyzer": "ngram_analyzer"
             },
             "file_id": {
                 "type": "text"
@@ -44,19 +41,31 @@
             "created": {
                 "type": "text"
             },
-            "timestamp": {
+            "mimetype": {
                 "type": "text"
             },
-            "mimetype": {
+            "message_id": {
                 "type": "text"
             },
             "filetype": {
                 "type": "text"
             },
-            "user_id": {
+            "file_hash": {
                 "type": "text"
             },
             "size": {
+                "type": "text"
+            },
+            "proxy_url": {
+                "type": "text"
+            },
+            "url": {
+                "type": "text"
+            },
+            "height": {
+                "type": "text"
+            },
+            "width": {
                 "type": "text"
             }
         }
