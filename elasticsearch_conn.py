@@ -7,6 +7,7 @@ from elasticsearch.exceptions import ConflictError
 class ElasticSearchConnector():
     def __init__(self, elastic_domain: str, elastic_port: str, index: str = 'file_index'):
         self.ES = self.make_connection(elastic_domain, elastic_port)
+
         self.index = index
         self.create_index()
 

@@ -18,12 +18,6 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 
 client = discord.Client()
 
-# s3_client = boto3.client(
-#     's3', endpoint_url=str(os.getenv('ENDPOINT_URL')),
-#     aws_access_key_id=str(os.getenv('AWS_ACCESS_KEY_ID')),
-#     aws_secret_access_key=str(os.getenv('AWS_SECRET_ACCESS_KEY'))
-# )
-
 es_client = ElasticSearchConnector(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
     elastic_port=os.getenv("ELASTIC_PORT"),
@@ -41,7 +35,6 @@ async def on_message(message):
     '''Send all message attachments to the CORTX s3 bucket'''
     if message.author == client.user:
         return
-
     # since cortx has been terminated, we won't be using it anymore :(
     await es_client.create_doc(message)
     if not message.content:
