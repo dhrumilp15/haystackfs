@@ -5,7 +5,11 @@ from elasticsearch.exceptions import ConflictError
 
 
 class ElasticSearchConnector():
-    def __init__(self, elastic_domain: str, elastic_port: str, index: str = 'file_index'):
+    def __init__(
+            self,
+            elastic_domain: str,
+            elastic_port: str,
+            index: str = 'file_index'):
         self.ES = self.make_connection(elastic_domain, elastic_port)
 
         self.index = index
@@ -23,24 +27,20 @@ class ElasticSearchConnector():
         self.ES.indices.create(index=self.index, body=json.load(
             open('elasticsearchconfig.json', 'r')))
 
-    def check_if_doc_exists(self, file: discord.Attachment, filehash: int):
-        return self.search_hash(filehash) or self.ES.exists(index=self.index, id=file.id)
+    def check_if_doc_exists(self, file: discord.Attachment):
+        return self.ES.exists(index=self.index, id=file.id)
 
     async def create_doc(self, message):
         for file in message.attachments:
             print("Attempting to create {}".format(file.filename))
-            hashbytes = await file.read()
-            hashbytes = hash(hashbytes)
-            if self.check_if_doc_exists(file=file, filehash=hashbytes):
-                continue
             try:
                 body = {
                     "author": str(message.author.id),
                     "author_name": message.author.name,
+                    "channel_id": str(message.channel.id),
+                    "created": str(message.created_at),
                     "file_id": str(file.id),
                     "file_name": file.filename,
-                    "file_hash": str(hashbytes),
-                    "created": str(message.created_at),
                     "mimetype": str(file.content_type),
                     "message_id": str(message.id),
                     "size": str(file.size),
@@ -55,22 +55,10 @@ class ElasticSearchConnector():
             except ConflictError as err:
                 print(f"Error is {err}")
 
-    def delete_doc(self, file_id):
+    def delete_doc(self, file_id: str):
         """Removes a document from the index"""
         if self.ES.exists(index=self.index, id=file_id):
             self.ES.delete(index=self.index, id=file_id)
-
-    def search_hash(self, filehash: int):
-        query = {
-            "query": {
-                "match": {
-                    "file_hash": {
-                        "query": str(filehash)
-                    },
-                }
-            }
-        }
-        return self.ES.search(index=self.index, body=query)["hits"]["hits"]
 
     def search(self, filename: str):
         query = {

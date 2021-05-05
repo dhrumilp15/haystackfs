@@ -4,10 +4,13 @@ import requests
 from io import BytesIO
 from typing import List, Dict
 
-import discord
 from dotenv import load_dotenv
-# import boto3
-# from upload_to_s3 import upload_to_s3
+import discord
+from discord.ext import commands
+from discord_slash import SlashCommand, SlashContext
+from discord_slash.model import SlashCommandOptionType
+from discord_slash.utils.manage_commands import create_choice, create_option
+
 from elasticsearch_conn import ElasticSearchConnector
 
 env_path = Path('.') / '.env'
@@ -16,7 +19,8 @@ load_dotenv(dotenv_path=env_path)
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-client = discord.Client()
+bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
+slash = SlashCommand(bot, sync_commands=True)
 
 es_client = ElasticSearchConnector(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
@@ -24,77 +28,248 @@ es_client = ElasticSearchConnector(
     index='file_index'
 )
 
+guild_ids = [812818660141170748]
 
-@client.event
+
+@bot.event
 async def on_ready():
-    print(f'{client.user} has connected to Discord!')
+    """Occurs when the discord client is ready."""
+    print(f'{bot.user} has connected to Discord!')
 
 
-@client.event
-async def on_message(message):
-    '''Send all message attachments to the CORTX s3 bucket'''
-    if message.author == client.user:
+@slash.slash(
+    name="all",
+    description="Show all files",
+    options=[
+        create_option(
+            name="dm",
+            description="If `True`, I'll dm you what I find. \
+                Otherwise, I'll send it to this channel",
+            option_type=SlashCommandOptionType.BOOLEAN,
+            required=False)],
+    guild_ids=guild_ids)
+async def _all(ctx, dm=False):
+    files = await fall(ctx)
+    if isinstance(files, str):
+        await ctx.send(files, hidden=True)
         return
-    # since cortx has been terminated, we won't be using it anymore :(
+
+    if dm:
+        await ctx.send(content="I'll dm you what I find", hidden=True)
+        await send_files_as_message(ctx.author, files)
+    else:
+        await send_files_as_message(ctx, files)
+
+
+@slash.slash(
+    name="search",
+    description="Search for files.",
+    options=[
+        create_option(
+            name="filename",
+            description="Even a partial name of your file will do :)",
+            option_type=SlashCommandOptionType.STRING,
+            required=True,
+        ),
+        create_option(
+            name="dm",
+            description="If `True`, I'll dm you what I find. \
+                Otherwise, I'll send it to this channel",
+            option_type=SlashCommandOptionType.BOOLEAN,
+            required=False,
+        )
+    ],
+    guild_ids=guild_ids)
+async def _search(ctx, filename, dm=False):
+    files = await fsearch(ctx, filename)
+    if isinstance(files, str):
+        await ctx.send(content=files, hidden=True)
+        return
+    if dm:
+        # await ctx.send(content=f"I'll dm you what I find", hidden=True)
+        await send_files_as_message(ctx.author, files)
+    else:
+        # await ctx.send(content=f"I'll send what I find in this channel",
+        # hidden=True)
+        await send_files_as_message(ctx, files)
+
+
+@slash.slash(
+    name="delete",
+    description="Delete files AND messages",
+    options=[
+        create_option(
+            name="filename",
+            description="Even a partial name of your files will do :)",
+            option_type=SlashCommandOptionType.STRING,
+            required=True,
+        )
+    ],
+    guild_ids=guild_ids)
+async def _delete(ctx, filename):
+    deleted_files = await fdelete(ctx, filename)
+    if isinstance(deleted_files, str):
+        await ctx.send(content=deleted_files, hidden=True)
+        return
+    await ctx.send(content=f"Deleted {' '.join(deleted_files)}", hidden=True)
+
+
+@slash.slash(
+    name="remove",
+    description="Remove files from index \
+        (These files will no longer be searchable!!)",
+    options=[
+        create_option(
+            name="filename",
+            description="Even a partial name of your files will do :)",
+            option_type=SlashCommandOptionType.STRING,
+            required=True,
+        )],
+    guild_ids=guild_ids)
+async def _remove(ctx, filename):
+    removed_files = await fremove(ctx, filename)
+    if isinstance(removed_files, str):
+        await ctx.send(content=removed_files, hidden=True)
+        return
+    await ctx.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
+
+
+@bot.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
+async def search(ctx, filename):
+    files = await fsearch(ctx, filename)
+    if isinstance(files, str):
+        await ctx.author.send(content=files, hidden=True)
+        return
+    await send_files_as_message(ctx, files)
+
+
+@bot.command(name="all", aliases=["a"], pass_context=True)
+async def all(ctx):
+    files = await fall(ctx)
+    if isinstance(files, str):
+        await ctx.author.send(files)
+        return
+    await send_files_as_message(ctx.author, files)
+
+
+@bot.command(name="delete", aliases=["del"], pass_context=True)
+async def delete(ctx, arg):
+    deleted_files = await fdelete(ctx, arg)
+    if isinstance(deleted_files, str):
+        await ctx.author.send(deleted_files)
+        return
+    await ctx.author.send("Deleted: " + ' '.join(deleted_files))
+
+
+@bot.command(name="remove", aliases=["rm"], pass_context=True)
+async def remove(ctx, arg):
+    removed_files = await fremove(ctx, arg)
+    if isinstance(removed_files, str):
+        await ctx.author.send(removed_files)
+        return
+    await ctx.author.send("Removed: " + ' '.join(removed_files))
+
+
+async def fremove(ctx, filename):
+    author = ctx.author
+    if not filename:
+        return f"Couldn't process your query: `{filename}`"
+
+    manageable_files = filter_messages_with_permissions(
+        author,
+        es_client.search(filename),
+        discord.Permissions(read_message_history=True)
+    )
+    if not manageable_files:
+        return f"I couldn't find any files related to `{filename}`"
+    removed_files = []
+    for file in manageable_files:
+        es_client.delete_doc(file['_id'])
+        removed_files.append(file['_source']['file_name'])
+    return removed_files
+
+
+async def fdelete(ctx, filename):
+    author = ctx.author
+    if not filename:
+        return f"Couldn't process your query: `{filename}`"
+
+    manageable_files = filter_messages_with_permissions(
+        author,
+        es_client.search(filename),
+        discord.Permissions(read_message_history=True)
+    )
+    if not manageable_files:
+        return f"I couldn't find any files related to `{filename}`"
+    deleted_files = []
+    for file in manageable_files:
+        es_client.delete_doc(file['_id'])
+        try:
+            onii_chan = bot.get_channel(int(file['_source']['channel_id']))
+            message = await onii_chan.fetch_message(file['_source']['message_id'])
+            await message.delete()
+            deleted_files.append(file['_source']['file_name'])
+        except discord.Forbidden:
+            continue
+    return deleted_files
+
+
+async def fall(ctx):
+    author = ctx.author
+    files = filter_messages_with_permissions(
+        author,
+        es_client.get_all_docs(),
+        discord.Permissions(read_message_history=True)
+    )
+    if not files:
+        return f"I couldn't find any files"
+    return files
+
+
+async def fsearch(ctx, filename):
+    author = ctx.author
+    if not filename:
+        return f"Couldn't process your query: `{filename}`"
+
+    files = filter_messages_with_permissions(
+        author,
+        es_client.search(filename),
+        discord.Permissions(read_message_history=True)
+    )
+    if not files:
+        return f"I couldn't find any files related to `{filename}`"
+    return files
+
+
+@bot.event
+async def on_message(message: discord.Message):
+    """Handles messages as they occur in the bot's channels.
+
+    For attachments:
+        Indexes any message attachments with ElasticSearch.
+
+    For queries:
+        Processes the appropriate queries.
+
+    Args:
+        message: A discord.Message that represents the newest message.
+    """
+    if message.author == bot.user:
+        return
     await es_client.create_doc(message)
-    if not message.content:
-        return
-    content = message.content.split()
-    print(content)
-    query = content.pop(0)
-    content = ' '.join(content)
-
-    if query == '!all' or query == '!a':
-        await send_files_as_message(message, es_client.get_all_docs(), content)
-
-    elif query == '!delete' or query == '!del':
-        files = es_client.search(content)
-        if not files:
-            await message.author.send(
-                f"Couldn't delete files related to `{content}`")
-            return
-
-        del_str = []
-        for file in files:
-            es_client.delete_doc(file['_id'])
-            msg = await message.channel.fetch_message(
-                file['_source']['message_id'])
-            try:
-                await msg.delete()
-                del_str.append(file['_source']['file_name'])
-            except discord.Forbidden:
-                await message.channel.send(
-                    f"Couldn't delete `{file['_source']['file_name']}`")
-        if del_str:
-            await message.author.send(f"Deleted: `{' '.join(del_str)}`")
-
-    elif query == '!remove' or query == '!rm':
-        files = es_client.search(content)
-        if not files:
-            await message.author.send(
-                f"Couldn't remove files related to `{content}`")
-            return
-
-        output_filenames = []
-        for file in files:
-            es_client.delete_doc(file['_id'])
-            output_filenames.append(file['_source']['file_name'])
-        if output_filenames:
-            await message.author.send(
-                f"Removed: `{' '.join(output_filenames)}`")
-
-    elif query == '!search' or query == '!s':
-        await send_files_as_message(message, es_client.search(content), content)
+    await bot.process_commands(message)
 
 
-@client.event
+@bot.event
 async def on_raw_message_delete(payload):
     if payload.cached_message is None:
-        onii_chan_id = payload.channel_id
-        onii_chan = client.get_channel(onii_chan_id)
+        onii_chan = bot.get_channel(payload.channel_id)
 
         if not onii_chan:
             return
+        # Can you simply put the expressions for fetching the message
+        # together here? Yes.
+        # But could I bring myself to do it? Never.
         message = await onii_chan.fetch_message(payload.message_id)
     else:
         message = payload.cached_message
@@ -102,38 +277,60 @@ async def on_raw_message_delete(payload):
         es_client.delete_doc(file.id)
 
 
-def check_if_author_can_view_message(author: discord.User,
-                                     message: discord.Message, file: List[Dict]):
-    """Checks if the author can view the file
+def filter_messages_with_permissions(
+        author: discord.User,
+        files: List[Dict],
+        perm: discord.Permissions) -> List[Dict]:
+    """Finds the messages that the `author` can view
 
     Args:
         author: The discord.User querying for files
         files: A list of dicts returned from ElasticSearch.
+        perm: The permission you're filtering with.
+
+    Returns:
+        A list of dicts of files from ElasticSearch that the author can view.
     """
-    file_message_id = file['_source']['message_id']
-    file_message_chan = message.channel.fetch_message(file_message_id).channel
+    viewable_files = []
+    for file in files:
+        file_chan_id = int(file['_source']['channel_id'])
+        file_message_chan = bot.get_channel(file_chan_id)
+        if isinstance(file_message_chan, discord.DMChannel):
+            continue
+        authorperms = file_message_chan.permissions_for(author)
+        # Question: What happens when a user is invited to a channel and has
+        # the `read_messages` permission?
+        # The user could only view messages posted *after* they were added.
+        # If their query has images posted both before *and* after the user was
+        # invited, what should we return?
+        if authorperms >= perm:
+            viewable_files.append(file)
+    return viewable_files
 
 
-async def send_files_as_message(search_message, files, content):
+async def send_files_as_message(author: discord.User or SlashContext,
+                                files: List[Dict]):
     """Sends files to the author of the message
 
     Args:
-        search_message: The original search message
-        files: The files returned from ElasticSearch
+        author: The author of the search query
+        files: A list of dicts of files returned from ElasticSearch
     """
-    if not files:
-        await search_message.author.send(
-            f"Couldn't find files related to `{content}` :(")
-        return
-    # if search_message.channel
-
     file_buf = download(files)
-    await search_message.author.send("Here's what I found:", files=file_buf)
+    await author.send(content="Here's what I found:", files=file_buf)
     for buf in file_buf:
         buf.close()
 
 
-def download(files: str):
+def download(files: List[Dict]) -> List[discord.File]:
+    """Downloads files from their urls (discord cdn)
+
+    Args:
+        files: A list of dicts of files from ElasticSearch.
+
+    Returns:
+        A list of discord.File objects of the files retrieved.
+    """
     filebufs = []
     for idx, file in enumerate(files):
         url = file['_source']['url']
@@ -154,4 +351,4 @@ def download(files: str):
     return filebufs
 
 
-client.run(TOKEN)
+bot.run(TOKEN)
