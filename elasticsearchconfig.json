@@ -30,15 +30,18 @@
             "author_name": {
                 "type": "text"
             },
+            "channel_id": {
+                "type": "text"
+            },
+            "created": {
+                "type": "text"
+            },
             "file_name": {
                 "type": "text",
                 "analyzer": "ngram_analyzer",
                 "search_analyzer": "ngram_analyzer"
             },
             "file_id": {
-                "type": "text"
-            },
-            "created": {
                 "type": "text"
             },
             "mimetype": {
@@ -48,9 +51,6 @@
                 "type": "text"
             },
             "filetype": {
-                "type": "text"
-            },
-            "file_hash": {
                 "type": "text"
             },
             "size": {
