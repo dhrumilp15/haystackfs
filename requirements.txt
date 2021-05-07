@@ -2,3 +2,4 @@ discord.py
 python-dotenv
 discord-py-slash-command
 elasticsearch
+requests
