@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import List, Dict
 
-from commands import fall, fdelete, fremove, fsearch
+from commands import fall, fdelete, fremove, fsearch, fclear
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
@@ -11,7 +11,7 @@ from discord_slash.model import SlashCommandOptionType
 from discord_slash.utils.manage_commands import create_option
 
 from utils import download
-from elasticsearch_conn import ElasticSearchConnector
+from elasticsearch_client import ElasticSearchClient
 
 
 load_dotenv(dotenv_path=Path('.') / '.env')
@@ -21,10 +21,9 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
 
-es_client = ElasticSearchConnector(
+es_client = ElasticSearchClient(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
-    elastic_port=os.getenv("ELASTIC_PORT"),
-    index='file_index'
+    elastic_port=os.getenv("ELASTIC_PORT")
 )
 guild_ids = [812818660141170748]
 
@@ -33,6 +32,23 @@ guild_ids = [812818660141170748]
 async def on_ready():
     """Occurs when the discord client is ready."""
     print(f'{bot.user} has connected to Discord!')
+
+
+@slash.slash(
+    name="clear",
+    description="Clear all docs. Use this power carefully.",
+    guild_ids=guild_ids
+)
+async def _clear(ctx: SlashContext):
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        await fclear(es_client, ctx.channel.id)
+    else:
+        await fclear(es_client, ctx.guild.id)
+    await ctx.send(content="Index cleared")
 
 
 @slash.slash(
@@ -51,7 +67,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
 
     Args:
         ctx: The SlashContext from which the command originated
-        dm: A bool for whether to dm the author the results.
+        DM: A bool for whether to dm the author the results.
     """
     files = await fall(ctx, es_client, bot)
     if isinstance(files, str):
@@ -84,31 +100,31 @@ async def _all(ctx: SlashContext, dm: bool = False):
         )
     ],
     guild_ids=guild_ids)
-async def _search(ctx, filename, dm=False):
+async def _search(ctx: SlashContext,
+                  filename: str,
+                  dm: bool = False):
     """Responds to `/search`. Tries to display docs related to
     a query from ElasticSearch.
 
     Args:
         ctx: The SlashContext from which the command originated
         filename: A str of the filename to query for.
-        dm: A bool for whether to dm the author the results.
+        DM: A bool for whether to dm the author the results.
     """
     files = await fsearch(ctx, filename, es_client, bot)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
     if dm:
-        # await ctx.send(content=f"I'll dm you what I find", hidden=True)
+        await ctx.send(content="I'll dm you what I find", hidden=True)
         await send_files_as_message(ctx.author, files)
     else:
-        # await ctx.send(content=f"I'll send what I find in this channel",
-        # hidden=True)
         await send_files_as_message(ctx, files)
 
 
 @slash.slash(
     name="delete",
-    description="Delete files AND messages",
+    description="Delete files AND their respective messages",
     options=[
         create_option(
             name="filename",
@@ -130,6 +146,7 @@ async def _delete(ctx, filename):
     if isinstance(deleted_files, str):
         await ctx.send(content=deleted_files, hidden=True)
         return
+    print(f"Deleting {filename}")
     await ctx.send(content=f"Deleted {' '.join(deleted_files)}", hidden=True)
 
 
@@ -175,18 +192,28 @@ async def search(ctx: commands.Context, filename: str):
     await send_files_as_message(ctx, files)
 
 
+@bot.command(name="clear", aliases=["c"], pass_context=True)
+async def clear(ctx: commands.Context):
+    if ctx.message.guild is not None:
+        await fclear(es_client, ctx.message.guild.id)
+    else:
+        await fclear(es_client, ctx.message.channel.id)
+
+
 @bot.command(name="all", aliases=["a"], pass_context=True)
-async def all_files(ctx: commands.Context):
+async def all_docs(ctx: commands.Context):
     """Displays all docs from ElasticSearch.
 
     Args:
         ctx: The commands.Context from which the command originated
     """
+
     files = await fall(ctx, es_client, bot)
     if isinstance(files, str):
         await ctx.author.send(files)
         return
     await send_files_as_message(ctx.author, files)
+    await ctx.send(es_client.get_all_indices())
 
 
 @bot.command(name="delete", aliases=["del"], pass_context=True)
@@ -221,6 +248,18 @@ async def remove(ctx, filename):
 
 
 @bot.event
+async def on_slash_command(ctx: SlashContext):
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        es_client.create_index(ctx.channel.id)
+    else:
+        es_client.create_index(ctx.guild.id)
+
+
+@bot.event
 async def on_message(message: discord.Message):
     """Handles messages as they occur in the bot's channels.
     For attachments:
@@ -230,17 +269,21 @@ async def on_message(message: discord.Message):
     Args:
         message: A discord.Message that represents the newest message.
     """
-
     if message.author == bot.user:
         return
+    if message.guild:
+        es_client.create_index(message.guild.id)
+        es_client.create_doc(message, message.guild.id)
+    else:
+        es_client.create_index(message.channel.id)
+        es_client.create_doc(message, message.channel.id)
 
-    await es_client.create_doc(message)
     await bot.process_commands(message)
 
 
 @bot.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
-    """Handles message deletion. Removes the respective documents from the index.
+    """Handles message deletion. Removes the respective documents from the index
 
     Args:
         payload: A discord.RawMessageDeleteEvent event.
@@ -254,8 +297,17 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         message = await onii_chan.fetch_message(payload.message_id)
     else:
         message = payload.cached_message
+        if isinstance(
+                message,
+                discord.DMChannel) or isinstance(
+                message,
+                discord.GroupChannel):
+            onii_chan_id = message.channel.id
+        else:
+            onii_chan_id = message.guild.id
+
     for file in message.attachments:
-        es_client.delete_doc(file.id)
+        es_client.delete_doc(file.id, onii_chan_id)
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
