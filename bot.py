@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from typing import List, Dict
 
@@ -12,7 +13,6 @@ from discord_slash.utils.manage_commands import create_option
 
 from utils import download
 from elasticsearch_client import ElasticSearchClient
-
 
 load_dotenv(dotenv_path=Path('.') / '.env')
 
@@ -120,6 +120,20 @@ async def _search(ctx: SlashContext,
         await send_files_as_message(ctx.author, files)
     else:
         await send_files_as_message(ctx, files)
+
+
+@bot.listen()
+async def on_slash_command_error(ctx, ex):
+    await ctx.send("""Sometimes cats need sleep when they encounter errors. \
+        The dev might be sleeping, but he'll get back to you as soon as he can.
+        I'd really appreciate it if you could send a brief error description \
+            to dhrumilp15#4369 :)""")
+    with open("err.log", 'w') as f:
+        try:
+            f.write(str(ex))
+            f.write("\n")
+        except BaseException:
+            print(ex)
 
 
 @slash.slash(
