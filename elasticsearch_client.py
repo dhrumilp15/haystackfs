@@ -4,33 +4,39 @@ from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConflictError
 
 
-class ElasticSearchConnector():
+class ElasticSearchClient():
     def __init__(
             self,
             elastic_domain: str,
-            elastic_port: str,
-            index: str = 'file_index'):
+            elastic_port: str):
         self.ES = self.make_connection(elastic_domain, elastic_port)
 
-        self.index = index
-        self.create_index()
-
-    def make_connection(self, domain: str, port: str):
+    def make_connection(self, domain: str, port: str) -> Elasticsearch:
         try:
             return Elasticsearch(domain + ':' + port)
-        except Exception as err:
+        except BaseException as err:
             print(f"Encountered {err}")
-            return None
 
-    def create_index(self):
-        self.ES.indices.delete(index=self.index, ignore=[400, 404])
-        self.ES.indices.create(index=self.index, body=json.load(
-            open('elasticsearchconfig.json', 'r')))
+    def clear_index(self, index: str):
+        try:
+            self.ES.indices.delete(index=index, ignore=[400, 404])
+        except BaseException as err:
+            print(err)
 
-    def check_if_doc_exists(self, file: discord.Attachment):
-        return self.ES.exists(index=self.index, id=file.id)
+    def create_index(self, index: str):
+        if not self.ES.indices.exists(index):
+            print(f"Creating a new index: {index}")
+            self.ES.indices.create(
+                index=index,
+                body=json.load(
+                    open('elasticsearchconfig.json', 'r')
+                )
+            )
 
-    async def create_doc(self, message):
+    def check_if_doc_exists(self, file: discord.Attachment, index: str):
+        return self.ES.exists(index=index, id=file.id)
+
+    def create_doc(self, message: discord.Message, index: str):
         for file in message.attachments:
             print("Attempting to create {}".format(file.filename))
             try:
@@ -51,16 +57,16 @@ class ElasticSearchConnector():
                     body["height"] = file.height
                     body["width"] = file.width
 
-                self.ES.create(index=self.index, id=file.id, body=body)
+                self.ES.create(index=index, id=file.id, body=body)
             except ConflictError as err:
                 print(f"Error is {err}")
 
-    def delete_doc(self, file_id: str):
+    def delete_doc(self, file_id: str, index: str):
         """Removes a document from the index"""
-        if self.ES.exists(index=self.index, id=file_id):
-            self.ES.delete(index=self.index, id=file_id)
+        if self.ES.exists(index=index, id=file_id):
+            self.ES.delete(index=index, id=file_id)
 
-    def search(self, filename: str):
+    def search(self, filename: str, index: str):
         query = {
             "query": {
                 "match": {
@@ -71,12 +77,14 @@ class ElasticSearchConnector():
                 }
             }
         }
-        return self.ES.search(index=self.index, body=query)["hits"]["hits"]
+        return self.ES.search(index=index, body=query)["hits"]["hits"]
 
-    def get_all_docs(self):
+    def get_all_docs(self, index: str):
         """Get all docs in ES"""
+        if not self.ES.indices.exists(index=index):
+            return
         result = self.ES.search(
-            index=self.index,
+            index=index,
             body={
                 "query": {
                     "match_all": {}
@@ -85,6 +93,9 @@ class ElasticSearchConnector():
         )
         return result["hits"]["hits"]
 
+    def get_all_indices(self):
+        return self.ES.indices.get('*')
+
 
 if __name__ == '__main__':
-    ElasticSearchConnector('http://localhost', '9200', 'file_index')
+    ElasticSearchClient('http://localhost', '9200')

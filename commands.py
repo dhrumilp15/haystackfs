@@ -3,14 +3,14 @@ from typing import List, Dict
 import discord
 from discord.ext import commands
 from discord_slash import SlashContext
-from elasticsearch import Elasticsearch
+from elasticsearch_client import ElasticSearchClient
 
 from utils import filter_messages_with_permissions
 
 
 async def fremove(ctx: SlashContext or commands.Context,
                   filename: str,
-                  es_client: Elasticsearch,
+                  es_client: ElasticSearchClient,
                   bot: commands.Bot) -> List[str]:
     """Removes files from ElasticSearch
 
@@ -27,9 +27,19 @@ async def fremove(ctx: SlashContext or commands.Context,
     if not filename:
         return f"Couldn't process your query: `{filename}`"
 
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        channel_id = ctx.channel.id
+    else:
+        channel_id = ctx.guild.id
+    files = es_client.search(filename=filename, index=channel_id)
+
     manageable_files = filter_messages_with_permissions(
         author,
-        es_client.search(filename),
+        files,
         discord.Permissions(read_message_history=True),
         bot
     )
@@ -37,14 +47,14 @@ async def fremove(ctx: SlashContext or commands.Context,
         return f"I couldn't find any files related to `{filename}`"
     removed_files = []
     for file in manageable_files:
-        es_client.delete_doc(file['_id'])
+        es_client.delete_doc(file_id=file['_id'], index=channel_id)
         removed_files.append(file['_source']['file_name'])
     return removed_files
 
 
 async def fdelete(ctx: SlashContext or commands.Context,
                   filename: str,
-                  es_client: Elasticsearch,
+                  es_client: ElasticSearchClient,
                   bot: commands.Bot) -> List[str]:
     """Removes files from ElasticSearch and deletes their respective discord
     messages.
@@ -61,10 +71,19 @@ async def fdelete(ctx: SlashContext or commands.Context,
     author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        channel_id = ctx.channel.id
+    else:
+        channel_id = ctx.guild.id
+    files = es_client.search(filename=filename, index=channel_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
-        es_client.search(filename),
+        files,
         discord.Permissions(read_message_history=True),
         bot
     )
@@ -72,10 +91,12 @@ async def fdelete(ctx: SlashContext or commands.Context,
         return f"I couldn't find any files related to `{filename}`"
     deleted_files = []
     for file in manageable_files:
-        es_client.delete_doc(file['_id'])
+        es_client.delete_doc(file_id=file['_id'], index=channel_id)
         try:
             onii_chan = bot.get_channel(int(file['_source']['channel_id']))
-            message = await onii_chan.fetch_message(file['_source']['message_id'])
+            message = await onii_chan.fetch_message(
+                file['_source']['message_id']
+            )
             await message.delete()
             deleted_files.append(file['_source']['file_name'])
         except discord.Forbidden:
@@ -84,7 +105,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
 
 
 async def fall(ctx: SlashContext or commands.Context,
-               es_client: Elasticsearch,
+               es_client: ElasticSearchClient,
                bot: commands.Bot) -> List[Dict]:
     """Finds all docs in ElasticSearch
 
@@ -97,20 +118,30 @@ async def fall(ctx: SlashContext or commands.Context,
         A list of dicts of viewable files.
     """
     author = ctx.author
-    files = filter_messages_with_permissions(
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        files = es_client.get_all_docs(ctx.channel.id)
+    else:
+        files = es_client.get_all_docs(ctx.guild.id)
+    if files is None:
+        return f"I couldn't find any files"
+    manageable_files = filter_messages_with_permissions(
         author,
-        es_client.get_all_docs(),
+        files,
         discord.Permissions(read_message_history=True),
         bot
     )
-    if not files:
+    if not manageable_files:
         return f"I couldn't find any files"
-    return files
+    return manageable_files
 
 
 async def fsearch(ctx: SlashContext or commands.Context,
                   filename: str,
-                  es_client: Elasticsearch,
+                  es_client: ElasticSearchClient,
                   bot: commands.Bot) -> List[Dict]:
     """Finds docs related to a queryin ElasticSearch
 
@@ -127,12 +158,25 @@ async def fsearch(ctx: SlashContext or commands.Context,
     if not filename:
         return f"Couldn't process your query: `{filename}`"
 
-    files = filter_messages_with_permissions(
+    if isinstance(
+            ctx.channel,
+            discord.DMChannel) or isinstance(
+            ctx.channel,
+            discord.GroupChannel):
+        files = es_client.get_all_docs(ctx.channel.id)
+    else:
+        files = es_client.get_all_docs(ctx.guild.id)
+
+    manageable_files = filter_messages_with_permissions(
         author,
-        es_client.search(filename),
+        files,
         discord.Permissions(read_message_history=True),
         bot
     )
-    if not files:
+    if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
-    return files
+    return manageable_files
+
+
+async def fclear(es_client: ElasticSearchClient, index: str):
+    es_client.clear_index(index)
