@@ -163,9 +163,9 @@ async def fsearch(ctx: SlashContext or commands.Context,
             discord.DMChannel) or isinstance(
             ctx.channel,
             discord.GroupChannel):
-        files = es_client.get_all_docs(ctx.channel.id)
+        files = es_client.search(ctx.channel.id, filename)
     else:
-        files = es_client.get_all_docs(ctx.guild.id)
+        files = es_client.search(ctx.guild.id, filename)
 
     manageable_files = filter_messages_with_permissions(
         author,
