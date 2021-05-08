@@ -1,8 +1,5 @@
-import requests
-import os
 from datetime import datetime
 from botocore.exceptions import ClientError
-from elasticsearch_conn import ElasticSearchConnector
 
 
 async def upload_to_s3(s3_client, es_client, message):
@@ -44,7 +41,6 @@ async def upload_to_s3(s3_client, es_client, message):
             print("File uploaded to S3 with key {}".format(file_name))
 
     except ClientError as e:
-        print("Couldn't upload to s3")
         print(e)
         return False
     except Exception as e:

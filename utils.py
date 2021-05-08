@@ -24,6 +24,7 @@ def filter_messages_with_permissions(
         file_chan_id = int(file['_source']['channel_id'])
         file_message_chan = bot.get_channel(file_chan_id)
         if isinstance(file_message_chan, discord.DMChannel):
+            viewable_files.append(file)
             continue
         authorperms = file_message_chan.permissions_for(author)
         # Question: What happens when a user is invited to a channel and has
