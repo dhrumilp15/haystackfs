@@ -127,7 +127,7 @@ async def fall(ctx: SlashContext or commands.Context,
     else:
         files = es_client.get_all_docs(ctx.guild.id)
     if files is None:
-        return f"I couldn't find any files"
+        return "I couldn't find any files"
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -135,7 +135,7 @@ async def fall(ctx: SlashContext or commands.Context,
         bot
     )
     if not manageable_files:
-        return f"I couldn't find any files"
+        return "I couldn't find any files"
     return manageable_files
 
 

@@ -39,6 +39,7 @@ async def on_ready():
     guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
+    # await ctx.defer()
     if isinstance(
             ctx.channel,
             discord.DMChannel) or isinstance(
@@ -47,7 +48,7 @@ async def _clear(ctx: SlashContext):
         await fclear(es_client, ctx.channel.id)
     else:
         await fclear(es_client, ctx.guild.id)
-    await ctx.send(content="Index cleared")
+    await ctx.send(content="Index cleared", hidden=True)
 
 
 @slash.slash(
@@ -68,6 +69,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ctx: The SlashContext from which the command originated
         DM: A bool for whether to dm the author the results.
     """
+    await ctx.defer()
     files = await fall(ctx, es_client, bot)
     if isinstance(files, str):
         await ctx.send(files, hidden=True)
@@ -77,7 +79,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         await ctx.send(content="I'll dm you what I find", hidden=True)
         await send_files_as_message(ctx.author, files)
     else:
-        await send_files_as_message(ctx, files)
+        await send_files_as_message(ctx.channel, files)
 
 
 @slash.slash(
@@ -110,31 +112,16 @@ async def _search(ctx: SlashContext,
         filename: A str of the filename to query for.
         DM: A bool for whether to dm the author the results.
     """
-    print(ctx)
+    await ctx.defer()
     files = await fsearch(ctx, filename, es_client, bot)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
-    print(len(files))
     if dm:
         await ctx.send(content="I'll dm you what I find", hidden=True)
         await send_files_as_message(ctx.author, files)
     else:
         await send_files_as_message(ctx, files)
-
-
-# @bot.event
-# async def on_slash_command_error(ctx, ex):
-#     await ctx.send("""Sometimes cats need sleep when they encounter errors. \
-#         The dev might be sleeping, but he'll get back to you as soon as he can.
-#         I'd really appreciate it if you could send a brief error description \
-#             to dhrumilp15#4369 :)""")
-#     with open("err.log", 'w') as f:
-#         try:
-#             f.write(str(ex))
-#             f.write("\n")
-#         except BaseException:
-#             print(ex)
 
 
 @slash.slash(
@@ -157,6 +144,7 @@ async def _delete(ctx, filename):
         ctx: The SlashContext from which the command originated
         filename: A str of the filename to query for.
     """
+    await ctx.defer()
     deleted_files = await fdelete(ctx, filename, es_client, bot)
     if isinstance(deleted_files, str):
         await ctx.send(content=deleted_files, hidden=True)
@@ -185,6 +173,7 @@ async def _remove(ctx: SlashContext, filename: str):
         ctx: The SlashContext from which the command originated
         filename: A str of the filename to query for.
     """
+    await ctx.defer()
     removed_files = await fremove(ctx, filename, es_client, bot)
     if isinstance(removed_files, str):
         await ctx.send(content=removed_files, hidden=True)
@@ -334,9 +323,8 @@ async def send_files_as_message(author: discord.User or SlashContext,
     """
     file_buf = download(files)
     if file_buf:
-        await author.send(content="Here's what I found:")
-        for file in file_buf:
-            await author.send(file=file)
-            file.close()
+        await author.send(content="Here's what I found:", files=file_buf)
+    for file in file_buf:
+        file.close()
 
 bot.run(TOKEN)
