@@ -163,7 +163,7 @@ async def fsearch(ctx: SlashContext or commands.Context,
             discord.DMChannel) or isinstance(
             ctx.channel,
             discord.GroupChannel):
-        files = es_client.search(filename, ctx.channel.id, )
+        files = es_client.search(filename, ctx.channel.id)
     else:
         files = es_client.search(filename, ctx.guild.id)
 
