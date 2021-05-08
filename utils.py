@@ -46,7 +46,7 @@ def download(files: List[Dict]) -> List[discord.File]:
         A list of discord.File objects of the files retrieved.
     """
     filebufs = []
-    for idx, file in enumerate(files):
+    for file in files:
         url = file['_source']['url']
         response = requests.get(url, stream=True)
         if not response.ok:
@@ -57,9 +57,5 @@ def download(files: List[Dict]) -> List[discord.File]:
                 break
             file_buf.write(blk)
         file_buf.seek(0)
-        filename = file['_source']['file_name']
-        if len(files) > 1:
-            ext = filename.rindex('.')
-            filename = filename[:ext] + str(idx) + filename[ext:]
-        filebufs.append(discord.File(file_buf, filename))
+        filebufs.append(discord.File(file_buf, file['_source']['file_name']))
     return filebufs

@@ -1,7 +1,7 @@
 import json
 import discord
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConflictError
+from elasticsearch.exceptions import ConflictError, RequestError
 
 
 class ElasticSearchClient():
@@ -24,7 +24,7 @@ class ElasticSearchClient():
             print(err)
 
     def create_index(self, index: str):
-        if not self.ES.indices.exists(index):
+        try:
             print(f"Creating a new index: {index}")
             self.ES.indices.create(
                 index=index,
@@ -32,6 +32,8 @@ class ElasticSearchClient():
                     open('elasticsearchconfig.json', 'r')
                 )
             )
+        except RequestError as ConflictError:
+            pass
 
     def check_if_doc_exists(self, file: discord.Attachment, index: str):
         return self.ES.exists(index=index, id=file.id)
@@ -58,8 +60,8 @@ class ElasticSearchClient():
                     body["width"] = file.width
 
                 self.ES.create(index=index, id=file.id, body=body)
-            except ConflictError as err:
-                print(f"Error is {err}")
+            except ConflictError:
+                continue
 
     def delete_doc(self, file_id: str, index: str):
         """Removes a document from the index"""
