@@ -3,7 +3,7 @@
 Just a better file manager for discord :)
 Implemented as a discord bot
 
-Commands
+## Commands
 
 I really like Discord's Slash Commands, so the bot supports older commands (Ex. `!all`) and slash commands (Ex. `/all`)
 
