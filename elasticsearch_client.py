@@ -67,7 +67,7 @@ class ElasticSearchClient():
         if self.ES.exists(index=index, id=file_id):
             self.ES.delete(index=index, id=file_id)
 
-    def search(self, filename: str, index: str):
+    def search(self, filename: str, index: str, filetype: str = None):
         """Searches for files by their filename
 
         Args:
@@ -87,6 +87,26 @@ class ElasticSearchClient():
                 }
             }
         }
+        if filetype is not None:
+            query["query"] = {
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "file_name": {
+                                    "query": filename,
+                                    "fuzziness": "AUTO"
+                                }
+                            }
+                        },
+                        {
+                            "match": {
+                                "mimetype": filetype
+                            }
+                        }
+                    ]
+                }
+            }
         return self.ES.search(index=index, body=query)["hits"]["hits"]
 
     def search_message_id(self, message_id: int, index: int) -> List[Dict]:

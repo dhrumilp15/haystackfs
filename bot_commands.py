@@ -142,7 +142,9 @@ async def fall(ctx: SlashContext or commands.Context,
 async def fsearch(ctx: SlashContext or commands.Context,
                   filename: str,
                   es_client: ElasticSearchClient,
-                  bot: commands.Bot) -> List[Dict]:
+                  bot: commands.Bot,
+                  mimetype: str = ""
+                  ) -> List[Dict]:
     """Finds docs related to a queryin ElasticSearch
 
     Args:
@@ -154,6 +156,7 @@ async def fsearch(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
+
     author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
@@ -163,9 +166,9 @@ async def fsearch(ctx: SlashContext or commands.Context,
             discord.DMChannel) or isinstance(
             ctx.channel,
             discord.GroupChannel):
-        files = es_client.search(filename, ctx.channel.id)
+        files = es_client.search(filename, ctx.channel.id, mimetype)
     else:
-        files = es_client.search(filename, ctx.guild.id)
+        files = es_client.search(filename, ctx.guild.id, mimetype)
 
     manageable_files = filter_messages_with_permissions(
         author,

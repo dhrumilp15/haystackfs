@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import List, Dict
 
-from commands import fall, fdelete, fremove, fsearch, fclear
+from bot_commands import fall, fdelete, fremove, fsearch, fclear
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
@@ -36,7 +36,7 @@ async def on_ready():
 @slash.slash(
     name="clear",
     description="Clears all docs. Use this power carefully.",
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
@@ -57,7 +57,7 @@ async def _clear(ctx: SlashContext):
                 Otherwise, I'll send it to this channel",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _all(ctx: SlashContext, dm: bool = False):
     """Responds to `/all`. Tries to display all docs from ElasticSearch.
@@ -91,7 +91,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ),
         create_option(
             name="filetype",
-            description="You can choose a specific filetype here",
+            description="You can choose a filetype here. Use `custom filetype` to specify a different one",
             option_type=SlashCommandOptionType.STRING,
             required=False,
             choices=sorted([create_choice(**tup)
@@ -99,7 +99,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ),
         create_option(
             name="custom_filetype",
-            description="You can specify a custom filetype here",
+            description="You can specify a filetype here",
             option_type=SlashCommandOptionType.STRING,
             required=False,
         ),
@@ -111,7 +111,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=False,
         )
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _search(ctx: SlashContext,
                   filename: str,
@@ -126,8 +126,10 @@ async def _search(ctx: SlashContext,
         filename: A str of the filename to query for.
         DM: A bool for whether to dm the author the results.
     """
+    if filetype == "OTHER" and custom_filetype is not None:
+        filetype = custom_filetype
     await ctx.defer()
-    files = await fsearch(ctx, filename, es_client, bot)
+    files = await fsearch(ctx, filename, es_client, bot, filetype)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
@@ -149,7 +151,7 @@ async def _search(ctx: SlashContext,
             required=True,
         )
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _delete(ctx, filename):
     """Responds to `/delete`. Tries to remove docs related to
@@ -178,7 +180,7 @@ async def _delete(ctx, filename):
             option_type=SlashCommandOptionType.STRING,
             required=True,
         )],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _remove(ctx: SlashContext, filename: str):
     """Responds to `/remove`. Tries to remove docs related to

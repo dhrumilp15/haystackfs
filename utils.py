@@ -8,11 +8,12 @@ CONTENT_TYPE_CHOICES = [
     {"name": "gif", "value": "image/gif"},
     {"name": "jpg/jpeg", "value": "image/jpeg"},
     {"name": "pdf", "value": "application/pdf"},
-    {"name": "png", "value": "image/pdf"},
+    {"name": "png", "value": "image/png"},
     {"name": "image", "value": "image"},
     {"name": "audio", "value": "audio"},
     {"name": "zip", "value": "application/zip"},
     {"name": "mp3/m4a", "value": "audio/mpeg"},
+    {"name": "none of them", "value": "OTHER"}
 ]
 
 
