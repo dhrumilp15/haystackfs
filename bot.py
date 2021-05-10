@@ -311,6 +311,17 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         es_client.delete_doc(file['_id'], onii_chan_id)
 
 
+@bot.event
+def on_guild_join(guild: discord.Guild):
+    """Log guild joins
+
+    Args:
+        guild: The discord.Guild that the bot just joined
+    """
+    with open("guild_joins.log", 'a') as fp:
+        fp.write(f"Joined {guild.name}\n")
+
+
 async def send_files_as_message(author: discord.User or SlashContext,
                                 files: List[Dict]):
     """Sends files to the author of the message
