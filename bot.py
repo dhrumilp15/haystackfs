@@ -8,14 +8,14 @@ import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.model import SlashCommandOptionType
-from discord_slash.utils.manage_commands import create_option
+from discord_slash.utils.manage_commands import create_option, create_choice
 
-from utils import download
+from utils import download, CONTENT_TYPE_CHOICES
 from elasticsearch_client import ElasticSearchClient
 
 load_dotenv(dotenv_path=Path('.') / '.env')
 
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('TEST_DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -24,7 +24,7 @@ es_client = ElasticSearchClient(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
     elastic_port=os.getenv("ELASTIC_PORT")
 )
-guild_ids = [os.getenv("GUILD_ID")]
+guild_ids = [int(os.getenv("GUILD_ID"))]
 
 
 @bot.event
@@ -35,7 +35,8 @@ async def on_ready():
 
 @slash.slash(
     name="clear",
-    description="Clears all docs. Use this power carefully."
+    description="Clears all docs. Use this power carefully.",
+    # guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
@@ -65,7 +66,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ctx: The SlashContext from which the command originated
         DM: A bool for whether to dm the author the results.
     """
-    # await ctx.defer()
+    await ctx.defer()
     files = await fall(ctx, es_client, bot)
     if isinstance(files, str):
         await ctx.send(files, hidden=True)
@@ -89,6 +90,20 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=True,
         ),
         create_option(
+            name="filetype",
+            description="You can choose a specific filetype here",
+            option_type=SlashCommandOptionType.STRING,
+            required=False,
+            choices=sorted([create_choice(**tup)
+                            for tup in CONTENT_TYPE_CHOICES], key=lambda val: val["name"])
+        ),
+        create_option(
+            name="custom_filetype",
+            description="You can specify a custom filetype here",
+            option_type=SlashCommandOptionType.STRING,
+            required=False,
+        ),
+        create_option(
             name="dm",
             description="If `True`, I'll dm you what I find. \
                 Otherwise, I'll send it to this channel",
@@ -100,6 +115,8 @@ async def _all(ctx: SlashContext, dm: bool = False):
 )
 async def _search(ctx: SlashContext,
                   filename: str,
+                  filetype: str = None,
+                  custom_filetype: str = None,
                   dm: bool = False):
     """Responds to `/search`. Tries to display docs related to
     a query from ElasticSearch.
@@ -311,15 +328,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         es_client.delete_doc(file['_id'], onii_chan_id)
 
 
-@bot.event
-def on_guild_join(guild: discord.Guild):
-    """Log guild joins
+# @bot.event
+# async def on_guild_join(guild: discord.Guild):
+#     """Log guild joins
 
-    Args:
-        guild: The discord.Guild that the bot just joined
-    """
-    with open("guild_joins.log", 'a') as fp:
-        fp.write(f"Joined {guild.name}\n")
+#     Args:
+#         guild: The discord.Guild that the bot just joined
+#     """
+#     with open("guild_joins.log", 'a') as fp:
+#         fp.write(f"Joined {guild.name}\n")
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
