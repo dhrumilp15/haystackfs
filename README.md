@@ -3,6 +3,8 @@
 Just a better file manager for discord :)
 Implemented as a discord bot
 
+Files you upload are *immediately* indexed so that you can search for files as soon as you can.
+
 ## Commands
 
 I really like Discord's Slash Commands, so the bot supports older commands (Ex. `!all`) and slash commands (Ex. `/all`)
