@@ -67,7 +67,12 @@ class ElasticSearchClient():
         if self.ES.exists(index=index, id=file_id):
             self.ES.delete(index=index, id=file_id)
 
-    def search(self, filename: str, index: str, filetype: str = None):
+    def search(
+            self,
+            filename: str,
+            index: str,
+            filetype: str = None,
+            author: str = None):
         """Searches for files by their filename
 
         Args:
@@ -79,34 +84,36 @@ class ElasticSearchClient():
         """
         query = {
             "query": {
-                "match": {
-                    "file_name": {
-                        "query": filename,
-                        "fuzziness": "AUTO",
-                    }
-                }
-            }
-        }
-        if filetype is not None:
-            query["query"] = {
                 "bool": {
                     "must": [
                         {
                             "match": {
                                 "file_name": {
                                     "query": filename,
-                                    "fuzziness": "AUTO"
+                                    "fuzziness": "AUTO",
                                 }
-                            }
-                        },
-                        {
-                            "match": {
-                                "mimetype": filetype
                             }
                         }
                     ]
                 }
             }
+        }
+        if filetype is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "match": {
+                        "mimetype": filetype
+                    }
+                }
+            )
+        if author is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "match": {
+                        "author": author
+                    }
+                }
+            )
         return self.ES.search(index=index, body=query)["hits"]["hits"]
 
     def search_message_id(self, message_id: int, index: int) -> List[Dict]:

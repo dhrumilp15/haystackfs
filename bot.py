@@ -104,6 +104,12 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=False,
         ),
         create_option(
+            name="author",
+            description="Searches messages by a user",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
             name="dm",
             description="If `True`, I'll dm you what I find. \
                 Otherwise, I'll send it to this channel",
@@ -117,6 +123,7 @@ async def _search(ctx: SlashContext,
                   filename: str,
                   filetype: str = None,
                   custom_filetype: str = None,
+                  author: str = None,
                   dm: bool = False):
     """Responds to `/search`. Tries to display docs related to
     a query from ElasticSearch.
@@ -129,7 +136,7 @@ async def _search(ctx: SlashContext,
     if filetype == "OTHER" and custom_filetype is not None:
         filetype = custom_filetype
     await ctx.defer()
-    files = await fsearch(ctx, filename, es_client, bot, filetype)
+    files = await fsearch(ctx, filename, es_client, bot, filetype, author)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return

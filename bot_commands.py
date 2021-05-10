@@ -143,7 +143,8 @@ async def fsearch(ctx: SlashContext or commands.Context,
                   filename: str,
                   es_client: ElasticSearchClient,
                   bot: commands.Bot,
-                  mimetype: str = ""
+                  mimetype: str = None,
+                  search_author: str = None,
                   ) -> List[Dict]:
     """Finds docs related to a queryin ElasticSearch
 
@@ -160,15 +161,25 @@ async def fsearch(ctx: SlashContext or commands.Context,
     author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
+    if search_author is not None:
+        search_author = str(ctx.guild.get_member_named(search_author).id)
 
     if isinstance(
             ctx.channel,
             discord.DMChannel) or isinstance(
             ctx.channel,
             discord.GroupChannel):
-        files = es_client.search(filename, ctx.channel.id, mimetype)
+        files = es_client.search(
+            filename,
+            ctx.channel.id,
+            mimetype,
+            search_author)
     else:
-        files = es_client.search(filename, ctx.guild.id, mimetype)
+        files = es_client.search(
+            filename,
+            ctx.guild.id,
+            mimetype,
+            search_author)
 
     manageable_files = filter_messages_with_permissions(
         author,
