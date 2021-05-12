@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 from discord_slash import SlashContext
 from elasticsearch_client import ElasticSearchClient
+from datetime import datetime
 
 from utils import filter_messages_with_permissions
 
@@ -126,8 +127,8 @@ async def fall(ctx: SlashContext or commands.Context,
         files = es_client.get_all_docs(ctx.channel.id)
     else:
         files = es_client.get_all_docs(ctx.guild.id)
-    if files is None:
-        return "I couldn't find any files"
+    if not files:
+        return "The archives are empty..."
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -135,7 +136,7 @@ async def fall(ctx: SlashContext or commands.Context,
         bot
     )
     if not manageable_files:
-        return "I couldn't find any files"
+        return "I couldn't find any files that you can access"
     return manageable_files
 
 
@@ -144,9 +145,13 @@ async def fsearch(ctx: SlashContext or commands.Context,
                   es_client: ElasticSearchClient,
                   bot: commands.Bot,
                   mimetype: str = None,
-                  search_author: str = None,
+                  author: discord.User = None,
+                  channel: discord.channel = None,
+                  content: str = None,
+                  after: datetime = None,
+                  before: datetime = None,
                   ) -> List[Dict]:
-    """Finds docs related to a queryin ElasticSearch
+    """Finds docs related to a query in ElasticSearch
 
     Args:
         ctx: The message's origin
@@ -158,37 +163,33 @@ async def fsearch(ctx: SlashContext or commands.Context,
         A list of dicts of viewable files.
     """
 
-    author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
-    if search_author is not None:
-        search_author = str(ctx.guild.get_member_named(search_author).id)
 
-    if isinstance(
-            ctx.channel,
-            discord.DMChannel) or isinstance(
-            ctx.channel,
-            discord.GroupChannel):
-        files = es_client.search(
-            filename,
-            ctx.channel.id,
-            mimetype,
-            search_author)
-    else:
-        files = es_client.search(
-            filename,
-            ctx.guild.id,
-            mimetype,
-            search_author)
+    onii_chan = ctx.channel
+    if ctx.guild is not None:
+        onii_chan = ctx.guild
+    files = es_client.search(
+        filename=filename,
+        index=onii_chan.id,
+        filetype=mimetype,
+        author=author,
+        channel=channel,
+        content=content,
+        after=after,
+        before=before
+    )
+    if not files:
+        return f"I couldn't find any files related to your query"
 
     manageable_files = filter_messages_with_permissions(
-        author,
+        ctx.author,
         files,
         discord.Permissions(read_message_history=True),
         bot
     )
     if not manageable_files:
-        return f"I couldn't find any files related to `{filename}`"
+        return f"I couldn't find any files that you can access"
     return manageable_files
 
 

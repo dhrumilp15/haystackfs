@@ -13,7 +13,7 @@ CONTENT_TYPE_CHOICES = [
     {"name": "audio", "value": "audio"},
     {"name": "zip", "value": "application/zip"},
     {"name": "mp3/m4a", "value": "audio/mpeg"},
-    {"name": "none of them", "value": "OTHER"}
+    {"name": "OTHER", "value": "OTHER"}
 ]
 
 

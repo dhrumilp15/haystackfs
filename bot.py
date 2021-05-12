@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 from typing import List, Dict
+from dateutil import parser
+import datetime
 
 from bot_commands import fall, fdelete, fremove, fsearch, fclear
 from dotenv import load_dotenv
@@ -95,17 +97,43 @@ async def _all(ctx: SlashContext, dm: bool = False):
             option_type=SlashCommandOptionType.STRING,
             required=False,
             choices=sorted([create_choice(**tup)
-                            for tup in CONTENT_TYPE_CHOICES], key=lambda val: val["name"])
+                            for tup in CONTENT_TYPE_CHOICES[:-1]], key=lambda val: val["name"]) + [create_choice(**(CONTENT_TYPE_CHOICES[-1]))]
         ),
         create_option(
             name="custom_filetype",
-            description="You can specify a filetype here",
+            description="Searches for files of a custom file type",
             option_type=SlashCommandOptionType.STRING,
             required=False,
         ),
         create_option(
             name="author",
-            description="Searches messages by a user",
+            description="Searches for files uploaded by a user",
+            option_type=SlashCommandOptionType.USER,
+            required=False
+        ),
+        create_option(
+            name="channel",
+            description="Searches for files in a channel",
+            option_type=SlashCommandOptionType.CHANNEL,
+            required=False
+        ),
+        create_option(
+            name="content",
+            description="Search for files in messages by message content",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
+            name="after",
+            description="Search for files after a date. \
+                Use the `before` option to specify a range of dates",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
+            name="before",
+            description="Search for files before a date. \
+                Use the `after` option to specify a range of dates",
             option_type=SlashCommandOptionType.STRING,
             required=False
         ),
@@ -115,7 +143,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
                 Otherwise, I'll send it to this channel",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False,
-        )
+        ),
     ],
     guild_ids=guild_ids
 )
@@ -123,7 +151,11 @@ async def _search(ctx: SlashContext,
                   filename: str,
                   filetype: str = None,
                   custom_filetype: str = None,
-                  author: str = None,
+                  author: discord.User = None,
+                  channel: discord.channel = None,
+                  content: str = None,
+                  after: str = None,
+                  before: str = None,
                   dm: bool = False):
     """Responds to `/search`. Tries to display docs related to
     a query from ElasticSearch.
@@ -133,13 +165,40 @@ async def _search(ctx: SlashContext,
         filename: A str of the filename to query for.
         DM: A bool for whether to dm the author the results.
     """
-    if filetype == "OTHER" and custom_filetype is not None:
-        filetype = custom_filetype
     await ctx.defer()
-    files = await fsearch(ctx, filename, es_client, bot, filetype, author)
+
+    if filetype == "OTHER" and custom_filetype is None:
+        await ctx.send(f"You specified a custom filetype but didn't provide one!")
+        return
+
+    if filetype is not None and custom_filetype is not None:
+        filetype = custom_filetype
+
+    if before is not None:
+        before = parser.parse(before)
+        # Long way to do it but I'm not sure how else to do this
+        before = datetime.datetime(*before.timetuple()[:3])
+        before += datetime.timedelta(days=1) - \
+            datetime.timedelta(microseconds=1)
+    if after is not None:
+        after = parser.parse(after)
+        after = datetime.datetime(*after.timetuple()[:3])
+        after -= datetime.timedelta(microseconds=1)
+
+    files = await fsearch(ctx=ctx,
+                          filename=filename,
+                          es_client=es_client,
+                          bot=bot,
+                          mimetype=filetype,
+                          author=author,
+                          content=content,
+                          channel=channel,
+                          after=after,
+                          before=before)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
+
     if dm:
         await ctx.send(content="I'll dm you what I find", hidden=True)
         await send_files_as_message(ctx.author, files)
