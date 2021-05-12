@@ -1,7 +1,8 @@
 # discordfs
 
-Just a better file manager for discord :)
-Implemented as a discord bot
+Discord's search bar leaves much to be desired when searching for files. Sure, you can specify that you're looking for a file with `has:file`, but you can't search **by filename** or **file content**. That's what `discordfs` aims to solve.
+
+Currently, you can search for files **by filename** and I'm working on ways to search by **file content**. 
 
 Files you upload are *immediately* indexed so that you can search for files as soon as you can.
 
