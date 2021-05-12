@@ -1,6 +1,6 @@
 # discordfs
 
-Discord's search bar leaves much to be desired when searching for files. Sure, you can specify that you're looking for a file with `has:file`, but you can't search **by filename** or **file content**. That's what `discordfs` aims to solve.
+Discord's search bar leaves much to be desired when searching for files. You can search for files with `has:file`, but you can't search **by filename** or **file content**. That's what `discordfs` aims to solve.
 
 With `discordfs`, you can search for files in your server **by filename** with `/search [filename]`! Hopefully, you'll be able to search by **file content** when I figure out how to implement that. 
 
