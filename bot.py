@@ -17,7 +17,7 @@ from elasticsearch_client import ElasticSearchClient
 
 load_dotenv(dotenv_path=Path('.') / '.env')
 
-TOKEN = os.getenv('TEST_DISCORD_TOKEN')
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -38,7 +38,7 @@ async def on_ready():
 @slash.slash(
     name="clear",
     description="Clears all docs. Use this power carefully.",
-    guild_ids=guild_ids
+    # guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
@@ -59,7 +59,7 @@ async def _clear(ctx: SlashContext):
                 Otherwise, I'll send it to this channel",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
-    guild_ids=guild_ids
+    # guild_ids=guild_ids
 )
 async def _all(ctx: SlashContext, dm: bool = False):
     """Responds to `/all`. Tries to display all docs from ElasticSearch.
@@ -145,7 +145,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=False,
         ),
     ],
-    guild_ids=guild_ids
+    # guild_ids=guild_ids
 )
 async def _search(ctx: SlashContext,
                   filename: str,
@@ -217,7 +217,7 @@ async def _search(ctx: SlashContext,
             required=True,
         )
     ],
-    guild_ids=guild_ids
+    # guild_ids=guild_ids
 )
 async def _delete(ctx, filename):
     """Responds to `/delete`. Tries to remove docs related to
@@ -246,7 +246,7 @@ async def _delete(ctx, filename):
             option_type=SlashCommandOptionType.STRING,
             required=True,
         )],
-    guild_ids=guild_ids
+    # guild_ids=guild_ids
 )
 async def _remove(ctx: SlashContext, filename: str):
     """Responds to `/remove`. Tries to remove docs related to
