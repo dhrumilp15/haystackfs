@@ -3,6 +3,7 @@ import discord
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import ConflictError, RequestError
 from typing import List, Dict
+from datetime import datetime
 
 
 class ElasticSearchClient():
@@ -33,10 +34,10 @@ class ElasticSearchClient():
                 )
             )
 
-    def check_if_doc_exists(self, file: discord.Attachment, index: str):
-        return self.ES.exists(index=index, id=file.id)
+    def check_if_doc_exists(self, file: discord.Attachment, index: int):
+        return self.ES.exists(index=str(index), id=str(file.id))
 
-    def create_doc(self, message: discord.Message, index: str):
+    def create_doc(self, message: discord.Message, index: int):
         for file in message.attachments:
             print(f"Attempting to create {file.filename}")
             try:
@@ -44,50 +45,132 @@ class ElasticSearchClient():
                     "author": str(message.author.id),
                     "author_name": message.author.name,
                     "channel_id": str(message.channel.id),
-                    "created": str(message.created_at),
+                    "content": message.content,
+                    "created_at":
+                    message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "file_id": str(file.id),
                     "file_name": file.filename,
-                    "mimetype": str(file.content_type),
+                    "mimetype": file.content_type,
                     "message_id": str(message.id),
+                    "proxy_url": file.proxy_url,
                     "size": str(file.size),
-                    "proxy_url": str(file.proxy_url),
-                    "url": str(file.url),
+                    "url": file.url,
                 }
                 if file.height and file.width:
-                    body["height"] = file.height
-                    body["width"] = file.width
-
-                self.ES.create(index=index, id=file.id, body=body)
+                    body["height"] = str(file.height)
+                    body["width"] = str(file.width)
+                self.ES.create(index=str(index), id=str(file.id), body=body)
             except ConflictError as err:
                 print(err)
                 continue
 
-    def delete_doc(self, file_id: str, index: str):
+    def delete_doc(self, file_id: int, index: int):
         """Removes a document from the index"""
-        if self.ES.exists(index=index, id=file_id):
-            self.ES.delete(index=index, id=file_id)
+        if self.ES.exists(index=str(index), id=str(file_id)):
+            self.ES.delete(index=str(index), id=str(file_id))
 
-    def search(self, filename: str, index: str):
+    def search(
+            self,
+            filename: str,
+            index: int,
+            filetype: str = None,
+            author: discord.User = None,
+            channel: discord.channel = None,
+            content: str = None,
+            after: datetime = None,
+            before: datetime = None,
+    ):
         """Searches for files by their filename
 
         Args:
             filename: A str of the filename
             index: A str of the index
+            filetype: A str of the file's mimetype
+            author: A discord.User of the author whose files to search for
 
         Returns:
             A list of dicts of files
         """
+        if not self.ES.indices.exists(str(index)):
+            print("Creating a new index since one doesn't exist")
+            self.create_index(str(index))
+            return
         query = {
             "query": {
-                "match": {
-                    "file_name": {
-                        "query": filename,
-                        "fuzziness": "AUTO",
-                    }
+                "bool": {
+                    "must": [
+                        {
+                            "match": {
+                                "file_name": {
+                                    "query": filename,
+                                    "fuzziness": "AUTO",
+                                }
+                            }
+                        }
+                    ]
                 }
             }
         }
-        return self.ES.search(index=index, body=query)["hits"]["hits"]
+        if filetype is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "match": {
+                        "mimetype": filetype
+                    }
+                }
+            )
+        if author is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "term": {
+                        "author": str(author.id)
+                    }
+                }
+            )
+        if channel is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "term": {
+                        "channel_id": str(channel.id)
+                    }
+                }
+            )
+        if before is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "range": {
+                        "created_at": {
+                            "lt": before
+                        }
+                    }
+                }
+            )
+        if after is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "range": {
+                        "created_at": {
+                            "gt": after
+                        }
+                    }
+                }
+            )
+        if content is not None:
+            query["query"]["bool"]["must"].append(
+                {
+                    "match": {
+                        "content": {
+                            "query": content,
+                            "fuzziness": "AUTO"
+                        }
+                    }
+                }
+            )
+
+        # if mentions is not None:
+        #     query["query"]["nested"] = {"path": "user", "query": {"bool": {
+        #         "must": list(map(lambda x: {"match": {"user.id": x.id}}, mentions))}}}
+        return self.ES.search(index=str(index), body=query)["hits"]["hits"]
 
     def search_message_id(self, message_id: int, index: int) -> List[Dict]:
         """Searches for files by their message id
@@ -99,24 +182,21 @@ class ElasticSearchClient():
         Returns:
             A list of dicts of files
         """
-        message_id = str(message_id)
-        index = str(index)
         query = {
             "query": {
                 "match": {
                     "message_id": {
-                        "query": message_id,
+                        "query": str(message_id),
                     }
                 }
             }
         }
-        return self.ES.search(index=index, body=query)["hits"]["hits"]
+        return self.ES.search(index=str(index), body=query)["hits"]["hits"]
 
-    def get_all_docs(self, index: str):
+    def get_all_docs(self, index: int):
         """Get all docs in ES"""
-        index = str(index)
         result = self.ES.search(
-            index=index,
+            index=str(index),
             body={
                 "query": {
                     "match_all": {}

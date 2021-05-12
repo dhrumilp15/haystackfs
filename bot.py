@@ -1,21 +1,23 @@
 import os
 from pathlib import Path
 from typing import List, Dict
+from dateutil import parser
+import datetime
 
-from commands import fall, fdelete, fremove, fsearch, fclear
+from bot_commands import fall, fdelete, fremove, fsearch, fclear
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.model import SlashCommandOptionType
-from discord_slash.utils.manage_commands import create_option
+from discord_slash.utils.manage_commands import create_option, create_choice
 
-from utils import download
+from utils import download, CONTENT_TYPE_CHOICES
 from elasticsearch_client import ElasticSearchClient
 
 load_dotenv(dotenv_path=Path('.') / '.env')
 
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('TEST_DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -24,7 +26,7 @@ es_client = ElasticSearchClient(
     elastic_domain=os.getenv("ELASTIC_DOMAIN"),
     elastic_port=os.getenv("ELASTIC_PORT")
 )
-guild_ids = [os.getenv("GUILD_ID")]
+guild_ids = [int(os.getenv("GUILD_ID"))]
 
 
 @bot.event
@@ -35,7 +37,8 @@ async def on_ready():
 
 @slash.slash(
     name="clear",
-    description="Clears all docs. Use this power carefully."
+    description="Clears all docs. Use this power carefully.",
+    guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
@@ -56,7 +59,7 @@ async def _clear(ctx: SlashContext):
                 Otherwise, I'll send it to this channel",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _all(ctx: SlashContext, dm: bool = False):
     """Responds to `/all`. Tries to display all docs from ElasticSearch.
@@ -65,7 +68,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ctx: The SlashContext from which the command originated
         DM: A bool for whether to dm the author the results.
     """
-    # await ctx.defer()
+    await ctx.defer()
     files = await fall(ctx, es_client, bot)
     if isinstance(files, str):
         await ctx.send(files, hidden=True)
@@ -89,17 +92,70 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=True,
         ),
         create_option(
+            name="filetype",
+            description="You can choose a filetype here. Use `custom filetype` to specify a different one",
+            option_type=SlashCommandOptionType.STRING,
+            required=False,
+            choices=sorted([create_choice(**tup)
+                            for tup in CONTENT_TYPE_CHOICES[:-1]], key=lambda val: val["name"]) + [create_choice(**(CONTENT_TYPE_CHOICES[-1]))]
+        ),
+        create_option(
+            name="custom_filetype",
+            description="Searches for files of a custom file type",
+            option_type=SlashCommandOptionType.STRING,
+            required=False,
+        ),
+        create_option(
+            name="author",
+            description="Searches for files uploaded by a user",
+            option_type=SlashCommandOptionType.USER,
+            required=False
+        ),
+        create_option(
+            name="channel",
+            description="Searches for files in a channel",
+            option_type=SlashCommandOptionType.CHANNEL,
+            required=False
+        ),
+        create_option(
+            name="content",
+            description="Search for files in messages by message content",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
+            name="after",
+            description="Search for files after a date. \
+                Use the `before` option to specify a range of dates",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
+            name="before",
+            description="Search for files before a date. \
+                Use the `after` option to specify a range of dates",
+            option_type=SlashCommandOptionType.STRING,
+            required=False
+        ),
+        create_option(
             name="dm",
             description="If `True`, I'll dm you what I find. \
                 Otherwise, I'll send it to this channel",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False,
-        )
+        ),
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _search(ctx: SlashContext,
                   filename: str,
+                  filetype: str = None,
+                  custom_filetype: str = None,
+                  author: discord.User = None,
+                  channel: discord.channel = None,
+                  content: str = None,
+                  after: str = None,
+                  before: str = None,
                   dm: bool = False):
     """Responds to `/search`. Tries to display docs related to
     a query from ElasticSearch.
@@ -110,10 +166,39 @@ async def _search(ctx: SlashContext,
         DM: A bool for whether to dm the author the results.
     """
     await ctx.defer()
-    files = await fsearch(ctx, filename, es_client, bot)
+
+    if filetype == "OTHER" and custom_filetype is None:
+        await ctx.send(f"You specified a custom filetype but didn't provide one!")
+        return
+
+    if filetype is not None and custom_filetype is not None:
+        filetype = custom_filetype
+
+    if before is not None:
+        before = parser.parse(before)
+        # Long way to do it but I'm not sure how else to do this
+        before = datetime.datetime(*before.timetuple()[:3])
+        before += datetime.timedelta(days=1) - \
+            datetime.timedelta(microseconds=1)
+    if after is not None:
+        after = parser.parse(after)
+        after = datetime.datetime(*after.timetuple()[:3])
+        after -= datetime.timedelta(microseconds=1)
+
+    files = await fsearch(ctx=ctx,
+                          filename=filename,
+                          es_client=es_client,
+                          bot=bot,
+                          mimetype=filetype,
+                          author=author,
+                          content=content,
+                          channel=channel,
+                          after=after,
+                          before=before)
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
+
     if dm:
         await ctx.send(content="I'll dm you what I find", hidden=True)
         await send_files_as_message(ctx.author, files)
@@ -132,7 +217,7 @@ async def _search(ctx: SlashContext,
             required=True,
         )
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _delete(ctx, filename):
     """Responds to `/delete`. Tries to remove docs related to
@@ -161,7 +246,7 @@ async def _delete(ctx, filename):
             option_type=SlashCommandOptionType.STRING,
             required=True,
         )],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _remove(ctx: SlashContext, filename: str):
     """Responds to `/remove`. Tries to remove docs related to
@@ -311,15 +396,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         es_client.delete_doc(file['_id'], onii_chan_id)
 
 
-@bot.event
-def on_guild_join(guild: discord.Guild):
-    """Log guild joins
+# @bot.event
+# async def on_guild_join(guild: discord.Guild):
+#     """Log guild joins
 
-    Args:
-        guild: The discord.Guild that the bot just joined
-    """
-    with open("guild_joins.log", 'a') as fp:
-        fp.write(f"Joined {guild.name}\n")
+#     Args:
+#         guild: The discord.Guild that the bot just joined
+#     """
+#     with open("guild_joins.log", 'a') as fp:
+#         fp.write(f"Joined {guild.name}\n")
 
 
 async def send_files_as_message(author: discord.User or SlashContext,

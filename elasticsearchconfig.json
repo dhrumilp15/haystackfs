@@ -33,8 +33,14 @@
             "channel_id": {
                 "type": "text"
             },
-            "created": {
-                "type": "text"
+            "content": {
+                "type": "text",
+                "analyzer": "ngram_analyzer",
+                "search_analyzer": "ngram_analyzer"
+            },
+            "created_at": {
+                "type": "date",
+                "format": "date_time"
             },
             "file_name": {
                 "type": "text",

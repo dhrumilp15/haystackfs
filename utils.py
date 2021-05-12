@@ -3,6 +3,19 @@ from io import BytesIO
 import requests
 import discord
 
+CONTENT_TYPE_CHOICES = [
+    {"name": "mp4", "value": "video/mp4"},
+    {"name": "gif", "value": "image/gif"},
+    {"name": "jpg/jpeg", "value": "image/jpeg"},
+    {"name": "pdf", "value": "application/pdf"},
+    {"name": "png", "value": "image/png"},
+    {"name": "image", "value": "image"},
+    {"name": "audio", "value": "audio"},
+    {"name": "zip", "value": "application/zip"},
+    {"name": "mp3/m4a", "value": "audio/mpeg"},
+    {"name": "OTHER", "value": "OTHER"}
+]
+
 
 def filter_messages_with_permissions(
         author: discord.User,
