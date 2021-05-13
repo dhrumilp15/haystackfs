@@ -4,7 +4,7 @@ Discord's search bar leaves much to be desired when searching for files. You can
 
 With `discordfs`, you can search for files in your server **by filename** with `/search [filename]`! (Searching by **file content** is coming soon!) 
 
-Files you upload are *immediately* indexed so that you can search for files as soon as you can.
+Files you upload are *immediately* indexed so that you can search for files as soon as they're uploaded to discord.
 
 ## Commands
 
