@@ -16,8 +16,8 @@ I really like Discord's Slash Commands, so the bot supports older commands (Ex. 
 - `/remove [filename]` : Remove the bot's access to files named `filename` (Also supports: `!remove`, `!rm`)
 - `/delete [filename]` : Remove the bot's access to files named `filename` AND delete their respective messages (Also supports: `!delete`, `!del`)
 
-Add the bot to your server with this link:
+[Click here to add the bot to your server](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands)!
 
-https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands
+If you want to try out any experimental features, [click here to add the test bot to your server](https://discord.com/api/oauth2/authorize?client_id=841182898778275881&permissions=2147871808&scope=bot%20applications.commands)!
 
 Plz let me know if you encounter bugs! Feel free to create an issue on this repo or message me at `dhrumilp15#4369`!
