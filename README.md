@@ -16,7 +16,7 @@ I really like Discord's Slash Commands, so the bot supports older commands (Ex. 
 - `/remove [filename]` : Remove the bot's access to files named `filename` (Also supports: `!remove`, `!rm`)
 - `/delete [filename]` : Remove the bot's access to files named `filename` AND delete their respective messages (Also supports: `!delete`, `!del`)
 
-# Search Options
+## Search Options
 
 You can narrow your search by specifying options!
 - File name: Searching for files by filenames is **currently** the cool part of discordfs, so this is the only required option in the option list. (That might change in the coming weeks ;)
