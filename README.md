@@ -30,4 +30,4 @@ You can narrow your search by specifying options!
 
 If you want to try out any experimental features, [click here to add the test bot to your server](https://discord.com/api/oauth2/authorize?client_id=841182898778275881&permissions=2147871808&scope=bot%20applications.commands)!
 
-Plz let me know if you encounter bugs! Feel free to create an issue on this repo or message me at `dhrumilp15#4369`!
+Plz let me know if you encounter bugs! Feel free to create an issue on this repo, message me at `dhrumilp15#4369` OR join the server: (https://discord.gg/cp6Wv3peec)!
