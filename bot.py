@@ -24,7 +24,7 @@ logging.basicConfig(
     filename='out.log',
     level=logging.DEBUG)
 
-TOKEN = CONFIG['TEST_DISCORD_TOKEN']
+TOKEN = CONFIG['DISCORD_TOKEN']
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -32,7 +32,8 @@ slash = SlashCommand(bot, sync_commands=True)
 es_client = ElasticSearchClient()
 mongo_client = MgClient()
 
-guild_ids = [int(CONFIG["GUILD_ID"])]
+# guild_ids = [int(CONFIG["GUILD_ID"])]
+guild_ids = []
 
 
 @bot.event
