@@ -1,3 +1,4 @@
+"""The ElasticSearch Client."""
 import json
 import discord
 from elasticsearch import Elasticsearch
@@ -5,27 +6,48 @@ from elasticsearch.exceptions import ConflictError, RequestError
 from typing import List, Dict
 from datetime import datetime
 
+from config import CONFIG
+
 
 class ElasticSearchClient():
-    def __init__(
-            self,
-            elastic_domain: str,
-            elastic_port: str):
-        self.ES = self.make_connection(elastic_domain, elastic_port)
+    """The ElasticSearch Client."""
 
-    def make_connection(self, domain: str, port: str) -> Elasticsearch:
+    def __init__(self):
+        """Initialize the ElasticSearch client."""
+        self.ES = self.connect(CONFIG["ELASTIC_DOMAIN"], CONFIG["ELASTIC_PORT"])
+        # self.last_snapshot = None
+        # snapshot_body = {
+        #     "type": "url", "settings": {
+        # "url": "http://download.elasticsearch.org/definitiveguide/sigterms_demo/"}}
+        # self.ES.snapshot.create_repository(
+        #     repository='MAIN', body=snapshot_body)
+
+    def connect(self, domain: str, port: str) -> Elasticsearch:
+        """Connect to the ElasticSearch API."""
         try:
             return Elasticsearch(domain + ':' + port)
         except BaseException as err:
             print(f"Encountered {err}")
 
     def clear_index(self, index: str):
+        """
+        Clear all documents from an index.
+
+        Arguments:
+            index: The index to clear
+        """
         try:
             self.ES.indices.delete(index=index, ignore=[400, 404])
         except BaseException as err:
             print(err)
 
     def create_index(self, index: str):
+        """
+        Create an index.
+
+        Arguments:
+            index: The name of the index to create
+        """
         if not self.ES.indices.exists(index):
             self.ES.indices.create(
                 index=index,
@@ -34,10 +56,27 @@ class ElasticSearchClient():
                 )
             )
 
-    def check_if_doc_exists(self, file: discord.Attachment, index: int):
+    def check_if_doc_exists(self, file: discord.Attachment, index: int) -> bool:
+        """
+        Check whether a doc exists.
+
+        Arguments:
+            file: The file to check
+            index: The index to search
+
+        Returns:
+            Whether the ElasticSearch index has the file
+        """
         return self.ES.exists(index=str(index), id=str(file.id))
 
     def create_doc(self, message: discord.Message, index: int):
+        """
+        Create a document in a given index.
+
+        Arguments:
+            message: The message to upload to an index
+            index: The index to upload to
+        """
         for file in message.attachments:
             print(f"Attempting to create {file.filename}")
             try:
@@ -48,11 +87,9 @@ class ElasticSearchClient():
                     "content": message.content,
                     "created_at":
                     message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    "file_id": str(file.id),
                     "file_name": file.filename,
                     "mimetype": file.content_type,
                     "message_id": str(message.id),
-                    "proxy_url": file.proxy_url,
                     "size": str(file.size),
                     "url": file.url,
                 }
@@ -64,8 +101,29 @@ class ElasticSearchClient():
                 print(err)
                 continue
 
+    def make_snapshot(self):
+        """Make a snapshot of the ElasticSearch Indices."""
+        self.last_snapshot = "snap_" + datetime.strftime(
+            datetime.now(), "%Y-%M-%DT%H:%m:%s")
+        self.ES.snapshot.create(
+            repository='test',
+            snapshot=self.last_snapshot,
+            wait_for_completion=True,
+        )
+
+    def restore_from_snapshot(self):
+        """Restore from last snapshot."""
+        if not self.last_snapshot:
+            return "SNAPSHOT HAS NOT YET BEEN INITIALIZED"
+
     def delete_doc(self, file_id: int, index: int):
-        """Removes a document from the index"""
+        """
+        Remove a document from the index.
+
+        Arguments:
+            file_id: The id of the file to delete
+            index: The index that contains the file
+        """
         if self.ES.exists(index=str(index), id=str(file_id)):
             self.ES.delete(index=str(index), id=str(file_id))
 
@@ -79,8 +137,9 @@ class ElasticSearchClient():
             content: str = None,
             after: datetime = None,
             before: datetime = None,
-    ):
-        """Searches for files by their filename
+    ) -> List[Dict]:
+        """
+        Search for files.
 
         Args:
             filename: A str of the filename
@@ -173,7 +232,8 @@ class ElasticSearchClient():
         return self.ES.search(index=str(index), body=query)["hits"]["hits"]
 
     def search_message_id(self, message_id: int, index: int) -> List[Dict]:
-        """Searches for files by their message id
+        """
+        Search for files by message id.
 
         Args:
             message_id: An int of the message id
@@ -194,7 +254,12 @@ class ElasticSearchClient():
         return self.ES.search(index=str(index), body=query)["hits"]["hits"]
 
     def get_all_docs(self, index: int):
-        """Get all docs in ES"""
+        """
+        Get all docs in ES.
+
+        Arguments:
+            index: The index of the pieces
+        """
         result = self.ES.search(
             index=str(index),
             body={
@@ -206,6 +271,7 @@ class ElasticSearchClient():
         return result["hits"]["hits"]
 
     def get_all_indices(self):
+        """Get all indices."""
         return self.ES.indices.get('*')
 
 
