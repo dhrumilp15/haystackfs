@@ -139,8 +139,7 @@ class MgClient:
             Whether the file was succesfully removed.
         """
         files_coll = self.db.files
-        res = files_coll.delete_many({"channel_id": serv_id})
-        res = files_coll.delete_many({"guild_id": serv_id})
+        res = files_coll.delete_many({"_id": serv_id})
         if res.acknowledged:
             logger.info(
                 f"Deleted files: {res.inserted_id} with server/channel id: {serv_id}")

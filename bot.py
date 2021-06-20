@@ -79,11 +79,13 @@ async def _all(ctx: SlashContext, dm: bool = False):
     if isinstance(files, str):
         await ctx.send(files, hidden=True)
         return
-
-    await ctx.send(content="Searching...", hidden=True)
+    if not files:
+        await ctx.send("Found no messages", hidden=True)
+        return
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
+        await ctx.send(content="Here's what I found", hidden=True)
         await send_files_as_message(ctx.channel, files)
 
 
@@ -417,15 +419,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         es_client.delete_doc(file['_id'], onii_chan_id)
 
 
-# @bot.event
-# async def on_guild_join(guild: discord.Guild):
-#     """Log guild joins
+@bot.event
+async def on_guild_join(guild: discord.Guild):
+    """
+    Log guild joins.
 
-#     Args:
-#         guild: The discord.Guild that the bot just joined
-#     """
-#     with open("guild_joins.log", 'a') as fp:
-#         fp.write(f"Joined {guild.name}\n")
+    Args:
+        guild: The discord.Guild that the bot just joined
+    """
+    mongo_client.add_server(guild)
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
