@@ -2,19 +2,27 @@
 import json
 import discord
 from elasticsearch import Elasticsearch
-from elasticsearch.exceptions import ConflictError, RequestError
+import elasticsearch
+from elasticsearch.exceptions import ConflictError, ConnectionError
 from typing import List, Dict
 from datetime import datetime
 
 from config import CONFIG
 
+CONN_ERR = "Could not connect to ElasticSearch. Please report this issue to dhrumilp15#4369 or on the discord server"
+
 
 class ElasticSearchClient():
     """The ElasticSearch Client."""
 
-    def __init__(self):
+    def __init__(self, domain=None, port=None):
         """Initialize the ElasticSearch client."""
-        self.ES = self.connect(CONFIG["ELASTIC_DOMAIN"], CONFIG["ELASTIC_PORT"])
+        if domain and port:
+            self.ES = self.connect(domain, port)
+        else:
+            self.ES = self.connect(
+                CONFIG["ELASTIC_DOMAIN"],
+                CONFIG["ELASTIC_PORT"])
         # self.last_snapshot = None
         # snapshot_body = {
         #     "type": "url", "settings": {
@@ -26,7 +34,7 @@ class ElasticSearchClient():
         """Connect to the ElasticSearch API."""
         try:
             return Elasticsearch(domain + ':' + port)
-        except BaseException as err:
+        except ConnectionError as err:
             print(f"Encountered {err}")
 
     def clear_index(self, index: str):
@@ -38,8 +46,8 @@ class ElasticSearchClient():
         """
         try:
             self.ES.indices.delete(index=index, ignore=[400, 404])
-        except BaseException as err:
-            print(err)
+        except ConnectionError:
+            return CONN_ERR
 
     def create_index(self, index: str):
         """
@@ -48,13 +56,15 @@ class ElasticSearchClient():
         Arguments:
             index: The name of the index to create
         """
-        if not self.ES.indices.exists(index):
+        try:
             self.ES.indices.create(
                 index=index,
                 body=json.load(
                     open('elasticsearchconfig.json', 'r')
                 )
             )
+        except ConnectionError:
+            return CONN_ERR
 
     def check_if_doc_exists(self, file: discord.Attachment, index: int) -> bool:
         """
@@ -67,7 +77,11 @@ class ElasticSearchClient():
         Returns:
             Whether the ElasticSearch index has the file
         """
-        return self.ES.exists(index=str(index), id=str(file.id))
+        try:
+            res = self.ES.exists(index=str(index), id=str(file.id))
+        except ConnectionError:
+            return CONN_ERR
+        return res
 
     def create_doc(self, message: discord.Message, index: int):
         """
@@ -79,25 +93,25 @@ class ElasticSearchClient():
         """
         for file in message.attachments:
             print(f"Attempting to create {file.filename}")
+            body = {
+                "author": str(message.author.id),
+                "author_name": message.author.name,
+                "channel_id": str(message.channel.id),
+                "content": message.content,
+                "created_at":
+                message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "file_name": file.filename,
+                "mimetype": file.content_type,
+                "message_id": str(message.id),
+                "size": str(file.size),
+                "url": file.url,
+            }
+            if file.height and file.width:
+                body["height"] = str(file.height)
+                body["width"] = str(file.width)
             try:
-                body = {
-                    "author": str(message.author.id),
-                    "author_name": message.author.name,
-                    "channel_id": str(message.channel.id),
-                    "content": message.content,
-                    "created_at":
-                    message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    "file_name": file.filename,
-                    "mimetype": file.content_type,
-                    "message_id": str(message.id),
-                    "size": str(file.size),
-                    "url": file.url,
-                }
-                if file.height and file.width:
-                    body["height"] = str(file.height)
-                    body["width"] = str(file.width)
                 self.ES.create(index=str(index), id=str(file.id), body=body)
-            except ConflictError as err:
+            except (ConflictError, ConnectionError) as err:
                 print(err)
                 continue
 
@@ -124,8 +138,10 @@ class ElasticSearchClient():
             file_id: The id of the file to delete
             index: The index that contains the file
         """
-        if self.ES.exists(index=str(index), id=str(file_id)):
+        try:
             self.ES.delete(index=str(index), id=str(file_id))
+        except (ConnectionError, elasticsearch.FileNotFoundError):
+            return
 
     def search(
             self,
@@ -150,10 +166,13 @@ class ElasticSearchClient():
         Returns:
             A list of dicts of files
         """
-        if not self.ES.indices.exists(str(index)):
-            print("Creating a new index since one doesn't exist")
-            self.create_index(str(index))
-            return
+        try:
+            if not self.ES.indices.exists(str(index)):
+                print("Creating a new index since one doesn't exist")
+                self.create_index(str(index))
+                return
+        except ConnectionError:
+            return CONN_ERR
         query = {
             "query": {
                 "bool": {
@@ -229,7 +248,11 @@ class ElasticSearchClient():
         # if mentions is not None:
         #     query["query"]["nested"] = {"path": "user", "query": {"bool": {
         #         "must": list(map(lambda x: {"match": {"user.id": x.id}}, mentions))}}}
-        return self.ES.search(index=str(index), body=query)["hits"]["hits"]
+        try:
+            res = self.ES.search(index=str(index), body=query)["hits"]["hits"]
+        except ConnectionError:
+            return CONN_ERR
+        return res
 
     def search_message_id(self, message_id: int, index: int) -> List[Dict]:
         """
@@ -251,29 +274,48 @@ class ElasticSearchClient():
                 }
             }
         }
-        return self.ES.search(index=str(index), body=query)["hits"]["hits"]
+        try:
+            res = self.ES.search(index=str(index), body=query)["hits"]["hits"]
+        except ConnectionError:
+            return CONN_ERR
+        return res
 
-    def get_all_docs(self, index: int):
+    def get_all_docs(self, index: int) -> str or List[Dict]:
         """
         Get all docs in ES.
 
         Arguments:
             index: The index of the pieces
         """
-        result = self.ES.search(
-            index=str(index),
-            body={
-                "query": {
-                    "match_all": {}
+        try:
+            result = self.ES.search(
+                index=str(index),
+                body={
+                    "query": {
+                        "match_all": {}
+                    }
                 }
-            }
-        )
+            )
+        except ConnectionError:
+            return CONN_ERR
         return result["hits"]["hits"]
 
     def get_all_indices(self):
         """Get all indices."""
-        return self.ES.indices.get('*')
+        try:
+            res = self.ES.indices.get('*')
+        except ConnectionError:
+            return CONN_ERR
+        return res
 
 
 if __name__ == '__main__':
-    ElasticSearchClient('http://localhost', '9200')
+    es = ElasticSearchClient(domain='http://localhost', port='8000')
+    print(es.get_all_indices())
+    print(es.get_all_docs(0))
+    print(es.search_message_id(0, 0))
+    print(es.search('bob', 0))
+    print(es.create_index(0))
+    print(es.clear_index(0))
+    # print(es.check_if_doc_exists(discord.Attachment(), 0))
+    # print(es.create_doc(discord.Message(state="", channel="", data=""), 0))
