@@ -3,3 +3,5 @@ python-dotenv
 discord-py-slash-command
 elasticsearch
 requests
+dnspython
+pymongo

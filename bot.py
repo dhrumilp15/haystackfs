@@ -1,32 +1,38 @@
-import os
-from pathlib import Path
+"""Main Bot Controller."""
 from typing import List, Dict
 from dateutil import parser
 import datetime
 
-from bot_commands import fall, fdelete, fremove, fsearch, fclear
-from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.model import SlashCommandOptionType
 from discord_slash.utils.manage_commands import create_option, create_choice
+import logging
+import sys
 
+
+from config import CONFIG
+from bot_commands import fall, fdelete, fremove, fsearch, fclear
 from utils import download, CONTENT_TYPE_CHOICES
 from elasticsearch_client import ElasticSearchClient
+from mongo_client import MgClient
 
-load_dotenv(dotenv_path=Path('.') / '.env')
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format='%(asctime)s: %(levelname)s:%(message)s',
+    filename='out.log',
+    level=logging.DEBUG)
 
-TOKEN = os.getenv('DISCORD_TOKEN')
+TOKEN = CONFIG['TEST_DISCORD_TOKEN']
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
 
-es_client = ElasticSearchClient(
-    elastic_domain=os.getenv("ELASTIC_DOMAIN"),
-    elastic_port=os.getenv("ELASTIC_PORT")
-)
-guild_ids = [int(os.getenv("GUILD_ID"))]
+es_client = ElasticSearchClient()
+mongo_client = MgClient()
+
+guild_ids = [int(CONFIG["GUILD_ID"])]
 
 
 @bot.event
@@ -38,7 +44,7 @@ async def on_ready():
 @slash.slash(
     name="clear",
     description="Clears all docs. Use this power carefully.",
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
@@ -55,11 +61,10 @@ async def _clear(ctx: SlashContext):
     options=[
         create_option(
             name="dm",
-            description="If `True`, I'll dm you what I find. \
-                Otherwise, I'll send it to this channel",
+            description="Whether I should dm you what I find",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _all(ctx: SlashContext, dm: bool = False):
     """Responds to `/all`. Tries to display all docs from ElasticSearch.
@@ -145,7 +150,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=False,
         ),
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _search(ctx: SlashContext,
                   filename: str,
@@ -157,8 +162,8 @@ async def _search(ctx: SlashContext,
                   after: str = None,
                   before: str = None,
                   dm: bool = False):
-    """Responds to `/search`. Tries to display docs related to
-    a query from ElasticSearch.
+    """
+    Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
 
     Args:
         ctx: The SlashContext from which the command originated
@@ -217,11 +222,11 @@ async def _search(ctx: SlashContext,
             required=True,
         )
     ],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _delete(ctx, filename):
-    """Responds to `/delete`. Tries to remove docs related to
-    a query from ElasticSearch and their respective discord messages.
+    """
+    Responds to `/delete`. Tries to remove docs related to a query from ElasticSearch and their respective discord messages.
 
     Args:
         ctx: The SlashContext from which the command originated
@@ -246,11 +251,11 @@ async def _delete(ctx, filename):
             option_type=SlashCommandOptionType.STRING,
             required=True,
         )],
-    # guild_ids=guild_ids
+    guild_ids=guild_ids
 )
 async def _remove(ctx: SlashContext, filename: str):
-    """Responds to `/remove`. Tries to remove docs related to
-    a query from ElasticSearch.
+    """
+    Responds to `/remove`. Tries to remove docs related to a query from ElasticSearch.
 
     Args:
         ctx: The SlashContext from which the command originated
@@ -266,7 +271,8 @@ async def _remove(ctx: SlashContext, filename: str):
 
 @bot.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
 async def search(ctx: commands.Context, filename: str):
-    """Tries to display docs related to a query from ElasticSearch.
+    """
+    Display docs related to a query from ElasticSearch.
 
     Args:
         ctx: The commands.Context from which the command originated
@@ -281,6 +287,7 @@ async def search(ctx: commands.Context, filename: str):
 
 @bot.command(name="clear", aliases=["c"], pass_context=True)
 async def clear(ctx: commands.Context):
+    """Clear the index associated with the current id."""
     if ctx.message.guild is not None:
         await fclear(es_client, ctx.message.guild.id)
     else:
@@ -289,7 +296,8 @@ async def clear(ctx: commands.Context):
 
 @bot.command(name="all", aliases=["a"], pass_context=True)
 async def all_docs(ctx: commands.Context):
-    """Displays all docs from ElasticSearch.
+    """
+    Display all docs from ElasticSearch.
 
     Args:
         ctx: The commands.Context from which the command originated
@@ -304,8 +312,8 @@ async def all_docs(ctx: commands.Context):
 
 @bot.command(name="delete", aliases=["del"], pass_context=True)
 async def delete(ctx: commands.Context, filename: str):
-    """Tries to delete docs related to the given filename from ElasticSearch
-    and their respective messages.
+    """
+    Delete docs related to the given filename from ElasticSearch and their respective messages.
 
     Args:
         ctx: The commands.Context from which the command originated
@@ -320,7 +328,8 @@ async def delete(ctx: commands.Context, filename: str):
 
 @bot.command(name="remove", aliases=["rm"], pass_context=True)
 async def remove(ctx, filename):
-    """Tries to remove docs related to the given filename from ElasticSearch.
+    """
+    Remove docs related to the given filename from ElasticSearch.
 
     Args:
         ctx: The commands.Context from which the command originated
@@ -335,15 +344,20 @@ async def remove(ctx, filename):
 
 @bot.event
 async def on_slash_command(ctx: SlashContext):
+    """Attempt to create an index for a channel on each command."""
     if ctx.guild_id is None:
         es_client.create_index(ctx.channel_id)
+        res = mongo_client.add_server(ctx.channel)
     else:
         es_client.create_index(ctx.guild_id)
+        res = mongo_client.add_server(ctx.guild)
 
 
 @bot.event
 async def on_message(message: discord.Message):
-    """Handles messages as they occur in the bot's channels.
+    """
+    Handle messages as they occur in the bot's channels.
+
     For attachments:
         Indexes any message attachments with ElasticSearch.
     For queries:
@@ -353,20 +367,26 @@ async def on_message(message: discord.Message):
     """
     if message.author == bot.user:
         return
-
+    # Only track files and servers that have files uploaded to them
+    serv_id = message.channel.id
     if message.guild is not None:
-        es_client.create_index(message.guild.id)
-        es_client.create_doc(message, message.guild.id)
-    else:
-        es_client.create_index(message.channel.id)
-        es_client.create_doc(message, message.channel.id)
+        serv_id = message.guild.id
+    es_client.create_index(serv_id)
+    es_client.create_doc(message, serv_id)
+    res = mongo_client.add_server(
+        message.guild if message.guild is not None else message.channel)
+    if message.attachments:
+        res = mongo_client.add_file(message)
+        await message.channel.send(f"Saved {res} image{'s' if res > 1 else ''}")
+        # es_client.make_snapshot()
 
     await bot.process_commands(message)
 
 
 @bot.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
-    """Handles message deletion. Removes the respective documents from the index.
+    """
+    Handle message deletion. Removes the respective documents from the index.
 
     This is also called when we delete messages in `_delete()`, but that's not
     a problem since we only remove docs from indices if they exist.
@@ -409,7 +429,9 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
 async def send_files_as_message(author: discord.User or SlashContext,
                                 files: List[Dict]):
-    """Sends files to the author of the message
+    """
+    Send files to the author of the message.
+
     Args:
         author: The author or SlashContext of the search query
         files: A list of dicts of files returned from ElasticSearch
