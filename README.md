@@ -6,6 +6,10 @@ With `discordfs`, you can search for files in your server **by filename** with `
 
 Files you upload are *immediately* indexed so that you can search for files as soon as you send them.
 
+Use the last working version [here](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands).
+
+The testing version of this bot was recently up but I took it down to make sure it performed as expected.
+
 ## Commands
 
 I really like Discord's Slash Commands, so the bot supports older commands (Ex. `!all`) and slash commands (Ex. `/all`)
