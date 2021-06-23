@@ -48,7 +48,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     removed_files = []
     for file in manageable_files:
         await es_client.delete_doc(file_id=file['_id'], index=serv_id)
-        res = await mg_client.remove_file(file=file['_id'])
+        res = await mg_client.remove_file(file['_id'])
         if res:
             removed_files.append(file['_source']['file_name'])
     return removed_files
@@ -75,6 +75,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
     author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
+
     if isinstance(
             ctx.channel,
             discord.DMChannel) or isinstance(
@@ -93,10 +94,11 @@ async def fdelete(ctx: SlashContext or commands.Context,
     )
     if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
+
     deleted_files = []
     for file in manageable_files:
         await es_client.delete_doc(file_id=file['_id'], index=channel_id)
-        res = await mg_client.remove_file(file=file['_id'])
+        res = await mg_client.remove_file(file['_id'])
         try:
             onii_chan = bot.get_channel(int(file['_source']['channel_id']))
             message = await onii_chan.fetch_message(
@@ -131,7 +133,7 @@ async def fall(ctx: SlashContext or commands.Context,
 
     files = await es_client.get_all_docs(serv_id)
     if not files:
-        return "The archives are empty..."
+        return "The archives are empty... Perhaps you could contribute..."
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -163,7 +165,7 @@ async def fsearch(ctx: SlashContext or commands.Context, filename: str, es_clien
     if ctx.guild is not None:
         onii_chan = ctx.guild
 
-    files = es_client.search(
+    files = await es_client.search(
         filename=filename,
         index=onii_chan.id,
         **kwargs

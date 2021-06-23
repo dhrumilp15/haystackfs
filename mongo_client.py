@@ -105,7 +105,7 @@ class MgClient:
 
         for file in message.attachments:
             # We've already added this file
-            n_doc = files_coll.count_documents({"_id": file.id}, limit=1)
+            n_doc = await files_coll.count_documents({"_id": file.id}, limit=1)
             if n_doc:
                 return True
             file_info = utils.attachment_to_mongo_dict(message, file)

@@ -75,23 +75,6 @@ class ElasticSearchClient():
         except ConnectionError:
             return CONN_ERR
 
-    async def check_if_doc_exists(self, file: discord.Attachment, index: int) -> bool:
-        """
-        Check whether a doc exists.
-
-        Arguments:
-            file: The file to check
-            index: The index to search
-
-        Returns:
-            Whether the ElasticSearch index has the file
-        """
-        try:
-            res = await self.ES.exists(index=str(index), id=str(file.id))
-        except ConnectionError:
-            return CONN_ERR
-        return res
-
     async def create_doc(self, message: discord.Message, index: int):
         """
         Create a document in a given index.
@@ -104,7 +87,6 @@ class ElasticSearchClient():
             body = attachment_to_es_dict(message, file)
             try:
                 res = await self.ES.create(index=str(index), id=str(file.id), body=body)
-                print(res)
             except (ConflictError, ConnectionError) as err:
                 logger.error(err)
                 continue
@@ -134,9 +116,8 @@ class ElasticSearchClient():
             index: The index that contains the file
         """
         try:
-            res = await self.ES.delete(index=str(index), id=str(file_id))
-            print(res)
-        except (ConnectionError, elasticsearch.FileNotFoundError):
+            await self.ES.delete(index=str(index), id=str(file_id))
+        except (ConnectionError, elasticsearch.NotFoundError):
             return CONN_ERR
 
     async def search(self, filename: str, index: int, **kwargs) -> List[Dict] or str:
