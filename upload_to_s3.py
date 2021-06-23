@@ -36,7 +36,7 @@ async def upload_to_s3(s3_client, es_client, message):
                 Key=file_name
             )
             print("Sent req to S3")
-            es_client.create_doc(file, message)
+            await es_client.create_doc(file, message)
 
             print("File uploaded to S3 with key {}".format(file_name))
 

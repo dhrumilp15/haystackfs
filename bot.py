@@ -10,6 +10,7 @@ from discord_slash.model import SlashCommandOptionType
 from discord_slash.utils.manage_commands import create_option, create_choice
 import logging
 import sys
+import argparse
 
 
 from config import CONFIG
@@ -18,22 +19,36 @@ from utils import download, CONTENT_TYPE_CHOICES
 from elasticsearch_client import ElasticSearchClient
 from mongo_client import MgClient
 
+discordlogger = logging.getLogger('discord')
+discordlogger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(
+    filename='discord.log',
+    encoding='utf-8',
+    mode='w')
+handler.setFormatter(
+    logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+)
+discordlogger.addHandler(handler)
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     format='%(asctime)s: %(levelname)s:%(message)s',
     filename='out.log',
     level=logging.DEBUG)
 
-TOKEN = CONFIG['DISCORD_TOKEN']
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
 
 es_client = ElasticSearchClient()
-mongo_client = MgClient()
+mg_client = MgClient()
 
-# guild_ids = [int(CONFIG["GUILD_ID"])]
-guild_ids = []
+TOKEN = CONFIG['TEST_DISCORD_TOKEN']
+guild_ids = [int(CONFIG["GUILD_ID"])]
+if CONFIG["DB_NAME"] == "production":
+    TOKEN = CONFIG['DISCORD_TOKEN']
+    guild_ids = []
+print(f'In {CONFIG["DB_NAME"]} mode')
 
 
 @bot.event
@@ -85,7 +100,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
-        await ctx.send(content="Here's what I found", hidden=True)
+        await ctx.send(content=f"Found {len(files)} file{'s' if len(files) > 1 else ''}", hidden=True)
         await send_files_as_message(ctx.channel, files)
 
 
@@ -192,7 +207,6 @@ async def _search(ctx: SlashContext,
         after = parser.parse(after)
         after = datetime.datetime(*after.timetuple()[:3])
         after -= datetime.timedelta(microseconds=1)
-
     files = await fsearch(ctx=ctx,
                           filename=filename,
                           es_client=es_client,
@@ -206,11 +220,11 @@ async def _search(ctx: SlashContext,
     if isinstance(files, str):
         await ctx.send(content=files, hidden=True)
         return
-
     if dm:
-        await ctx.send(content="I'll dm you what I find", hidden=True)
+        await ctx.author.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx.author, files)
     else:
+        await ctx.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx, files)
 
 
@@ -236,7 +250,7 @@ async def _delete(ctx, filename):
         filename: A str of the filename to query for.
     """
     await ctx.defer()
-    deleted_files = await fdelete(ctx, filename, es_client, bot)
+    deleted_files = await fdelete(ctx, filename, es_client, mg_client, bot)
     if isinstance(deleted_files, str):
         await ctx.send(content=deleted_files, hidden=True)
         return
@@ -265,7 +279,7 @@ async def _remove(ctx: SlashContext, filename: str):
         filename: A str of the filename to query for.
     """
     await ctx.defer()
-    removed_files = await fremove(ctx, filename, es_client, bot)
+    removed_files = await fremove(ctx, filename, es_client, mg_client, bot)
     if isinstance(removed_files, str):
         await ctx.send(content=removed_files, hidden=True)
         return
@@ -283,7 +297,7 @@ async def search(ctx: commands.Context, filename: str):
     """
     files = await fsearch(ctx, filename, es_client, bot)
     if isinstance(files, str):
-        await ctx.author.send(content=files, hidden=True)
+        await ctx.author.send(content=files)
         return
     await send_files_as_message(ctx, files)
 
@@ -292,9 +306,9 @@ async def search(ctx: commands.Context, filename: str):
 async def clear(ctx: commands.Context):
     """Clear the index associated with the current id."""
     if ctx.message.guild is not None:
-        await fclear(es_client, ctx.message.guild.id)
+        await fclear(es_client, mg_client, ctx.message.guild.id)
     else:
-        await fclear(es_client, ctx.message.channel.id)
+        await fclear(es_client, mg_client, ctx.message.channel.id)
 
 
 @bot.command(name="all", aliases=["a"], pass_context=True)
@@ -322,7 +336,7 @@ async def delete(ctx: commands.Context, filename: str):
         ctx: The commands.Context from which the command originated
         filename: A str of the filename to query for
     """
-    deleted_files = await fdelete(ctx, filename, es_client, bot)
+    deleted_files = await fdelete(ctx, filename, es_client, mg_client, bot)
     if isinstance(deleted_files, str):
         await ctx.author.send(deleted_files)
         return
@@ -338,7 +352,7 @@ async def remove(ctx, filename):
         ctx: The commands.Context from which the command originated
         filename: A str of the filename to query for
     """
-    removed_files = await fremove(ctx, filename, es_client, bot)
+    removed_files = await fremove(ctx, filename, es_client, mg_client, bot)
     if isinstance(removed_files, str):
         await ctx.author.send(removed_files)
         return
@@ -348,12 +362,12 @@ async def remove(ctx, filename):
 @bot.event
 async def on_slash_command(ctx: SlashContext):
     """Attempt to create an index for a channel on each command."""
-    if ctx.guild_id is None:
-        es_client.create_index(ctx.channel_id)
-        res = mongo_client.add_server(ctx.channel)
-    else:
-        es_client.create_index(ctx.guild_id)
-        res = mongo_client.add_server(ctx.guild)
+    serv = ctx.channel
+    if ctx.guild_id is not None:
+        serv = ctx.guild
+
+    await es_client.create_index(serv.id)
+    await mg_client.add_server(serv)
 
 
 @bot.event
@@ -371,17 +385,18 @@ async def on_message(message: discord.Message):
     if message.author == bot.user:
         return
     # Only track files and servers that have files uploaded to them
-    serv_id = message.channel.id
+    serv = message.channel
     if message.guild is not None:
-        serv_id = message.guild.id
-    es_client.create_index(serv_id)
-    es_client.create_doc(message, serv_id)
-    res = mongo_client.add_server(
-        message.guild if message.guild is not None else message.channel)
+        serv = message.guild
+    await es_client.create_index(serv.id)
+    await es_client.create_doc(message, serv.id)
+    await mg_client.add_server(serv)
+
     if message.attachments:
-        res = mongo_client.add_file(message)
-        await message.channel.send(f"Saved {res} image{'s' if res > 1 else ''}")
-        # es_client.make_snapshot()
+        saved_files = await mg_client.add_file(message)
+        if saved_files:
+            await message.channel.send(f"Saved {len(message.attachments)} file{'s' if len(message.attachments) > 1 else ''}")
+    # await es_client.make_snapshot()
 
     await bot.process_commands(message)
 
@@ -404,19 +419,15 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         # if the message is cached, we'll know whether the author is a bot user
         if message.author == bot.user:
             return
-        if isinstance(
-                message,
-                discord.DMChannel) or isinstance(
-                message,
-                discord.GroupChannel):
-            onii_chan_id = message.channel.id
-        else:
+        onii_chan_id = message.channel.id
+        if message.guild is not None:
             onii_chan_id = message.guild.id
-    files = es_client.search_message_id(
+
+    files = await es_client.search_message_id(
         message_id=payload.message_id, index=onii_chan_id)
 
     for file in files:
-        es_client.delete_doc(file['_id'], onii_chan_id)
+        await es_client.delete_doc(file['_id'], onii_chan_id)
 
 
 @bot.event
@@ -427,7 +438,29 @@ async def on_guild_join(guild: discord.Guild):
     Args:
         guild: The discord.Guild that the bot just joined
     """
-    mongo_client.add_server(guild)
+    await mg_client.add_server(guild)
+
+
+@bot.event
+async def on_guild_remove(guild: discord.Guild):
+    """
+    Log guild joins.
+
+    Args:
+        guild: The discord.Guild that the bot just joined
+    """
+    await mg_client.remove_server(guild)
+
+
+@bot.event
+async def on_command_error(ctx, e):
+    """Command Error Handler."""
+    await ctx.author.send(f"""I had some trouble understanding that query. \
+All I see is `{e}`. \
+If there was an issue in your query, please try again with any \
+necessary adjustments. \
+If you think there's an issue with the bot, \
+please message `dhrumilp15#4369`!""")
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
@@ -439,10 +472,8 @@ async def send_files_as_message(author: discord.User or SlashContext,
         author: The author or SlashContext of the search query
         files: A list of dicts of files returned from ElasticSearch
     """
-    file_buf = download(files)
-    for file in file_buf:
+    async for file in download(files, mg_client):
         await author.send(file=file)
-    for file in file_buf:
         file.close()
 
 bot.run(TOKEN)
