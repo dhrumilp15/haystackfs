@@ -1,15 +1,16 @@
 """MongoDB Client."""
 import logging
-from pymongo import MongoClient
-from pymongo.results import InsertOneResult
+import motor.motor_asyncio
 from config import CONFIG
 import discord
-from datetime import datetime
+import utils
+# import utils.server_to_mongo_dict as server_to_mongo_dict
+# import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     format='%(asctime)s: {%(filename)s:%(funcName)s:%(lineno)d} - %(levelname)s: %(message)s',
-    filename='out.log',
+    filename='mg_client.log',
     level=logging.DEBUG)
 
 
@@ -18,11 +19,28 @@ class MgClient:
 
     def __init__(self):
         """Initialize the MongoDB Client and database."""
-        self.client = MongoClient(CONFIG["MONGO_ENDPOINT"])
+        self.client = motor.motor_asyncio.AsyncIOMotorClient(
+            CONFIG["MONGO_ENDPOINT"])
         self.db = self.client[CONFIG["DB_NAME"]]
         logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
 
-    def add_server(self, server: discord.Guild or discord.DMChannel):
+    async def get_file(self, file_id: int) -> dict:
+        """
+        Get the file url of the file id.
+
+        Args:
+            file_id: The id of the file to retrieve.
+
+        Returns:
+            The file url as a str.
+        """
+        res = await self.db.files.find_one(
+            {"_id": int(file_id)},
+            {"url": 1, "file_name": 1}
+        )
+        return res
+
+    async def add_server(self, server: discord.Guild or discord.DMChannel):
         """
         Add a server or channel to the `servers` collection.
 
@@ -34,25 +52,11 @@ class MgClient:
         """
         server_coll = self.db.servers
         # We've already added the server
-        if server_coll.count_documents({"_id": server.id}, limit=1):
+        num_docs = await server_coll.count_documents({"_id": server.id}, limit=1)
+        if num_docs:
             return True
-        server_info = {
-            "_id": server.id,
-            "created_at": server.created_at,
-            "owner_id": server.owner_id,
-            "owner_name": server.owner.name + '#' + str(server.owner.discriminator),
-            "members": server.member_count,
-            "max_members": server.max_members,
-            "description": server.description,
-            "large": server.large,
-            "name": server.name,
-            "filesize_limit": server.filesize_limit,
-            "icon": server.icon,
-            "region": server.region,
-            "timestamp": datetime.now(),
-            "bot_in_server": True,
-        }
-        res = server_coll.insert_one(server_info)
+        server_info = utils.server_to_mongo_dict(server)
+        res = await server_coll.insert_one(server_info)
         if res.acknowledged:
             logger.info(
                 f"Inserted new server: {res.inserted_id} with server id: {server.id}")
@@ -61,7 +65,28 @@ class MgClient:
                 f"Failed to insert new server: {res.inserted_id} with server id: {server.id}")
         return res.acknowledged
 
-    def add_file(self, message: discord.Message) -> int:
+    async def remove_server(self, server: discord.Guild) -> bool:
+        """
+        Mark the bot as not in this server.
+
+        Args:
+            guild: The guild to remove the bot from.
+
+        Returns:
+            Whether the remove operation was successful.
+        """
+        server_coll = self.db.servers
+        res = await server_coll.update_one({"guild_id": server.id}, {
+            '$set': {"bot_in_server": False}})
+        if res.acknowledged:
+            logger.info(
+                f"Marked the bot as not in server: {res.inserted_id} with server id: {server.id}")
+        else:
+            logger.error(
+                f"Failed to mark bot as not in server: {res.inserted_id} with server id: {server.id}")
+        return res.acknowledged
+
+    async def add_file(self, message: discord.Message) -> int:
         """
         Add a file to the `files` collection.
 
@@ -74,31 +99,17 @@ class MgClient:
         files_coll = self.db.files
         files_added = 0
         # We've already added the files in this message id
-        if files_coll.count_documents({"message_id": message.id}, limit=1):
+        num_docs = await files_coll.count_documents({"message_id": message.id}, limit=1)
+        if num_docs:
             return True
 
         for file in message.attachments:
             # We've already added this file
-            if files_coll.count_documents({"_id": file.id}, limit=1):
+            n_doc = files_coll.count_documents({"_id": file.id}, limit=1)
+            if n_doc:
                 return True
-            file_info = {
-                "_id": file.id,
-                "author": message.author.id,
-                "author_name": message.author.name + '#' + str(message.author.discriminator),
-                "channel_id": message.channel.id,
-                "guild_id": message.guild.id if message.guild.id is not None else -1,
-                "content": message.content,
-                "created_at": message.created_at,
-                "file_name": file.filename,
-                "mimetype": file.content_type,
-                "message_id": message.id,
-                "size": file.size,
-                "url": file.url,
-                "height": file.height if file.height else -1,
-                "width": file.width if file.width else -1,
-                "timestamp": datetime.now()}
-
-            res = files_coll.insert_one(file_info)
+            file_info = utils.attachment_to_mongo_dict(message, file)
+            res = await files_coll.insert_one(file_info)
             if res.acknowledged:
                 logger.info(
                     f"Inserted new file: {res.inserted_id} with file id: {file.id}")
@@ -108,7 +119,7 @@ class MgClient:
                     f"Failed to insert new file: {res.inserted_id} with file id: {file.id}")
         return files_added
 
-    def remove_file(self, file_id: str):
+    async def remove_file(self, file_id: str):
         """
         Remove a file.
 
@@ -119,35 +130,43 @@ class MgClient:
             Whether the file was succesfully removed.
         """
         files_coll = self.db.files
-        res = files_coll.delete_one({"_id": file_id})
+        res = await files_coll.delete_one({"_id": file_id})
         if res.acknowledged:
             logger.info(
-                f"Deleted file: {res.inserted_id} with file id: {file_id}")
+                f"Deleted file: {res.raw_result} with file id: {file_id}")
         else:
             logger.error(
-                f"Failed to delete new file: {res.inserted_id} with file id: {file_id}")
+                f"Failed to delete new file: {res.raw_result} with file id: {file_id}")
         return res.acknowledged
 
-    def mass_remove_file(self, serv_id: str):
+    async def mass_remove_file(self, serv_id: str):
         """
         Remove a file.
 
         Args:
-            file: The id of the file to remove
+            serv_id: The id of the server/channel to remove all files from
 
         Returns:
-            Whether the file was succesfully removed.
+            Whether the delete operation was succesfully performed and at least 1 file was deleted.
         """
         files_coll = self.db.files
-        res = files_coll.delete_many({"_id": serv_id})
+        res = await files_coll.delete_many({"guild_id": serv_id})
         if res.acknowledged:
             logger.info(
-                f"Deleted files: {res.inserted_id} with server/channel id: {serv_id}")
+                f"Deleted files: {res.deleted_count} with server/channel id: {serv_id}")
         else:
             logger.error(
-                f"Failed to delete new file: {res.inserted_id} with server/channel id: {serv_id}")
-        return res.acknowledged
+                f"Failed to delete new file: {res.raw_result} with server/channel id: {serv_id}")
+        return res.acknowledged and res.deleted_count > 0
 
+
+async def basic_tests():
+    """Run Basic tests."""
+    mg = MgClient()
+    # await mg.add_file()
+    # await mg.add_server()
 
 if __name__ == '__main__':
-    MgClient()
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(basic_tests())

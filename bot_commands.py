@@ -1,15 +1,13 @@
 """The core functionality of the bot."""
-from pymongo import mongo_client
 from mongo_client import MgClient
 from elasticsearch_client import ElasticSearchClient
 
 import discord
 from discord.ext import commands
 from discord_slash import SlashContext
-from datetime import datetime
 from typing import List, Dict
 
-from utils import filter_messages_with_permissions
+from utils import filter_messages_with_permissions, attachment_to_es_dict
 
 
 async def fremove(ctx: SlashContext or commands.Context,
@@ -37,7 +35,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     if ctx.guild is not None:
         serv_id = ctx.guild.id
 
-    files = es_client.search(filename=filename, index=serv_id)
+    files = await es_client.search(filename=filename, index=serv_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -49,7 +47,7 @@ async def fremove(ctx: SlashContext or commands.Context,
         return f"I couldn't find any files related to `{filename}`"
     removed_files = []
     for file in manageable_files:
-        es_client.delete_doc(file_id=file['_id'], index=serv_id)
+        await es_client.delete_doc(file_id=file['_id'], index=serv_id)
         res = mg_client.remove_file(file=file['_id'])
         if res:
             removed_files.append(file['_source']['file_name'])
@@ -85,7 +83,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
         channel_id = ctx.channel.id
     else:
         channel_id = ctx.guild.id
-    files = es_client.search(filename=filename, index=channel_id)
+    files = await es_client.search(filename=filename, index=channel_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -97,7 +95,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
         return f"I couldn't find any files related to `{filename}`"
     deleted_files = []
     for file in manageable_files:
-        es_client.delete_doc(file_id=file['_id'], index=channel_id)
+        await es_client.delete_doc(file_id=file['_id'], index=channel_id)
         res = mg_client.remove_file(file=file['_id'])
         try:
             onii_chan = bot.get_channel(int(file['_source']['channel_id']))
@@ -127,14 +125,11 @@ async def fall(ctx: SlashContext or commands.Context,
         A list of dicts of viewable files.
     """
     author = ctx.author
-    if isinstance(
-            ctx.channel,
-            discord.DMChannel) or isinstance(
-            ctx.channel,
-            discord.GroupChannel):
-        files = es_client.get_all_docs(ctx.channel.id)
-    else:
-        files = es_client.get_all_docs(ctx.guild.id)
+    serv_id = ctx.channel.id
+    if ctx.guild is not None:
+        serv_id = ctx.guild.id
+
+    files = await es_client.get_all_docs(serv_id)
     if not files:
         return "The archives are empty..."
     manageable_files = filter_messages_with_permissions(
@@ -148,17 +143,7 @@ async def fall(ctx: SlashContext or commands.Context,
     return manageable_files
 
 
-async def fsearch(ctx: SlashContext or commands.Context,
-                  filename: str,
-                  es_client: ElasticSearchClient,
-                  bot: commands.Bot,
-                  mimetype: str = None,
-                  author: discord.User = None,
-                  channel: discord.channel = None,
-                  content: str = None,
-                  after: datetime = None,
-                  before: datetime = None,
-                  ) -> List[Dict]:
+async def fsearch(ctx: SlashContext or commands.Context, filename: str, es_client: ElasticSearchClient, bot: commands.Bot, **kwargs) -> List[Dict]:
     """
     Find docs related to a query in ElasticSearch.
 
@@ -177,24 +162,23 @@ async def fsearch(ctx: SlashContext or commands.Context,
     onii_chan = ctx.channel
     if ctx.guild is not None:
         onii_chan = ctx.guild
+
     files = es_client.search(
         filename=filename,
         index=onii_chan.id,
-        filetype=mimetype,
-        author=author,
-        channel=channel,
-        content=content,
-        after=after,
-        before=before
+        **kwargs
     )
+    # past_files = await past_search(ctx, filename, bot, **kwargs)
+    # files.extend(past_files)
+
     if not files:
         return f"I couldn't find any files related to your query"
 
     manageable_files = filter_messages_with_permissions(
-        ctx.author,
-        files,
-        discord.Permissions(read_message_history=True),
-        bot
+        author=ctx.author,
+        files=files,
+        perm=discord.Permissions(read_message_history=True),
+        bot=bot
     )
     if not manageable_files:
         return f"I couldn't find any files that you can access"
@@ -210,5 +194,70 @@ async def fclear(es_client: ElasticSearchClient, mg_client: MgClient, index: str
         mg_client: The MongoDB client
         index: The index to clear
     """
-    es_client.clear_index(index)
+    await es_client.clear_index(index)
     mg_client.mass_remove_file(index)
+
+
+def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):
+    """
+    Match the message against possible arguments.
+
+    Args:
+        message: The message to test
+        kwargs: kwargs of args to match
+
+    Returns:
+        True if the message matches
+    """
+    res = []
+    if not message.attachments or message.author == bot.user:
+        return []
+    if kwargs.get("content"):
+        if kwargs["content"] not in message.content:
+            return []
+    if kwargs.get("after"):
+        if message.created_at < kwargs["after"]:
+            return []
+    if kwargs.get("before"):
+        if message.created_at > kwargs["before"]:
+            return []
+    if kwargs.get("author"):
+        if message.author != kwargs["author"]:
+            return []
+    if kwargs.get("channel"):
+        if message.channel != kwargs["channel"]:
+            return []
+    for attachment in message.attachments:
+        if kwargs.get("mimetype"):
+            if attachment.content_type != kwargs["mimetype"]:
+                continue
+        if filename in attachment.filename:
+            res.append(attachment_to_es_dict(attachment))
+    return res
+
+
+async def past_search(
+        ctx: SlashContext or commands.Context,
+        filename: str,
+        bot: commands.Bot,
+        **kwargs) -> List[discord.Attachment]:
+    """
+    Iterate through previous messages in a discord channel for files.
+
+    Args:
+        ctx: The message's origin
+        filename: The query
+        es_client: The ElasticSearch client
+        bot: The discord bot
+
+    Returns:
+        A list of dicts of viewable files.
+    """
+    print(kwargs)
+    files = []
+    print("Started searching on previous files")
+    matched_messages = await ctx.channel.history(limit=100, before=kwargs["before"], after=kwargs["after"]).flatten()
+    print(f"Grabbed {len(matched_messages)} messages")
+    for message in matched_messages:
+        files.extend(match(message, bot=bot, filename=filename, kwargs=kwargs))
+    return files

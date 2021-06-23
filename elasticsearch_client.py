@@ -1,15 +1,23 @@
 """The ElasticSearch Client."""
+import logging
 import json
 import discord
-from elasticsearch import Elasticsearch
 import elasticsearch
+from elasticsearch import AsyncElasticsearch
 from elasticsearch.exceptions import ConflictError, ConnectionError
 from typing import List, Dict
 from datetime import datetime
+from utils import attachment_to_es_dict
 
 from config import CONFIG
 
 CONN_ERR = "Could not connect to ElasticSearch. Please report this issue to dhrumilp15#4369 or on the discord server"
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    format='%(asctime)s: %(levelname)s:%(message)s',
+    filename='es_client.log',
+    level=logging.DEBUG)
 
 
 class ElasticSearchClient():
@@ -30,14 +38,14 @@ class ElasticSearchClient():
         # self.ES.snapshot.create_repository(
         #     repository='MAIN', body=snapshot_body)
 
-    def connect(self, domain: str, port: str) -> Elasticsearch:
+    def connect(self, domain: str, port: str) -> AsyncElasticsearch:
         """Connect to the ElasticSearch API."""
         try:
-            return Elasticsearch(domain + ':' + port)
-        except ConnectionError as err:
-            print(f"Encountered {err}")
+            return AsyncElasticsearch(domain + ':' + port)
+        except ConnectionError:
+            return CONN_ERR
 
-    def clear_index(self, index: str):
+    async def clear_index(self, index: str):
         """
         Clear all documents from an index.
 
@@ -45,11 +53,11 @@ class ElasticSearchClient():
             index: The index to clear
         """
         try:
-            self.ES.indices.delete(index=index, ignore=[400, 404])
+            await self.ES.indices.delete(index=index, ignore=[400, 404])
         except ConnectionError:
             return CONN_ERR
 
-    def create_index(self, index: str):
+    async def create_index(self, index: str):
         """
         Create an index.
 
@@ -57,16 +65,17 @@ class ElasticSearchClient():
             index: The name of the index to create
         """
         try:
-            self.ES.indices.create(
+            await self.ES.indices.create(
                 index=index,
                 body=json.load(
                     open('elasticsearchconfig.json', 'r')
-                )
+                ),
+                ignore=[400]
             )
         except ConnectionError:
             return CONN_ERR
 
-    def check_if_doc_exists(self, file: discord.Attachment, index: int) -> bool:
+    async def check_if_doc_exists(self, file: discord.Attachment, index: int) -> bool:
         """
         Check whether a doc exists.
 
@@ -78,12 +87,12 @@ class ElasticSearchClient():
             Whether the ElasticSearch index has the file
         """
         try:
-            res = self.ES.exists(index=str(index), id=str(file.id))
+            res = await self.ES.exists(index=str(index), id=str(file.id))
         except ConnectionError:
             return CONN_ERR
         return res
 
-    def create_doc(self, message: discord.Message, index: int):
+    async def create_doc(self, message: discord.Message, index: int):
         """
         Create a document in a given index.
 
@@ -92,45 +101,31 @@ class ElasticSearchClient():
             index: The index to upload to
         """
         for file in message.attachments:
-            print(f"Attempting to create {file.filename}")
-            body = {
-                "author": str(message.author.id),
-                "author_name": message.author.name,
-                "channel_id": str(message.channel.id),
-                "content": message.content,
-                "created_at":
-                message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "file_name": file.filename,
-                "mimetype": file.content_type,
-                "message_id": str(message.id),
-                "size": str(file.size),
-                "url": file.url,
-            }
-            if file.height and file.width:
-                body["height"] = str(file.height)
-                body["width"] = str(file.width)
+            body = attachment_to_es_dict(message, file)
             try:
-                self.ES.create(index=str(index), id=str(file.id), body=body)
+                res = await self.ES.create(index=str(index), id=str(file.id), body=body)
+                print(res)
             except (ConflictError, ConnectionError) as err:
-                print(err)
+                logger.error(err)
                 continue
 
-    def make_snapshot(self):
+    async def make_snapshot(self):
         """Make a snapshot of the ElasticSearch Indices."""
         self.last_snapshot = "snap_" + datetime.strftime(
             datetime.now(), "%Y-%M-%DT%H:%m:%s")
-        self.ES.snapshot.create(
+        res = await self.ES.snapshot.create(
             repository='test',
             snapshot=self.last_snapshot,
             wait_for_completion=True,
         )
+        print(res)
 
     def restore_from_snapshot(self):
         """Restore from last snapshot."""
         if not self.last_snapshot:
             return "SNAPSHOT HAS NOT YET BEEN INITIALIZED"
 
-    def delete_doc(self, file_id: int, index: int):
+    async def delete_doc(self, file_id: int, index: int):
         """
         Remove a document from the index.
 
@@ -139,21 +134,12 @@ class ElasticSearchClient():
             index: The index that contains the file
         """
         try:
-            self.ES.delete(index=str(index), id=str(file_id))
+            res = await self.ES.delete(index=str(index), id=str(file_id))
+            print(res)
         except (ConnectionError, elasticsearch.FileNotFoundError):
-            return
+            return CONN_ERR
 
-    def search(
-            self,
-            filename: str,
-            index: int,
-            filetype: str = None,
-            author: discord.User = None,
-            channel: discord.channel = None,
-            content: str = None,
-            after: datetime = None,
-            before: datetime = None,
-    ) -> List[Dict]:
+    async def search(self, filename: str, index: int, **kwargs) -> List[Dict] or str:
         """
         Search for files.
 
@@ -166,14 +152,11 @@ class ElasticSearchClient():
         Returns:
             A list of dicts of files
         """
-        try:
-            if not self.ES.indices.exists(str(index)):
-                print("Creating a new index since one doesn't exist")
-                self.create_index(str(index))
-                return
-        except ConnectionError:
-            return CONN_ERR
+        index_res = await self.create_index(str(index))
+        if index_res:
+            return index_res
         query = {
+            # "_source": False,
             "query": {
                 "bool": {
                     "must": [
@@ -189,72 +172,71 @@ class ElasticSearchClient():
                 }
             }
         }
-        if filetype is not None:
+        if kwargs.get("mimetype"):
             query["query"]["bool"]["must"].append(
                 {
                     "match": {
-                        "mimetype": filetype
+                        "mimetype": kwargs["mimetype"]
                     }
                 }
             )
-        if author is not None:
+        if kwargs.get("author"):
             query["query"]["bool"]["must"].append(
                 {
                     "term": {
-                        "author": str(author.id)
+                        "author": str(kwargs["author"].id)
                     }
                 }
             )
-        if channel is not None:
+        if kwargs.get("channel"):
             query["query"]["bool"]["must"].append(
                 {
                     "term": {
-                        "channel_id": str(channel.id)
+                        "channel_id": str(kwargs["channel"].id)
                     }
                 }
             )
-        if before is not None:
+        if kwargs.get("before"):
             query["query"]["bool"]["must"].append(
                 {
                     "range": {
                         "created_at": {
-                            "lt": before
+                            "lt": kwargs["before"]
                         }
                     }
                 }
             )
-        if after is not None:
+        if kwargs.get("after"):
             query["query"]["bool"]["must"].append(
                 {
                     "range": {
                         "created_at": {
-                            "gt": after
+                            "gt": kwargs["after"]
                         }
                     }
                 }
             )
-        if content is not None:
+        if kwargs.get("content"):
             query["query"]["bool"]["must"].append(
                 {
                     "match": {
                         "content": {
-                            "query": content,
+                            "query": kwargs["content"],
                             "fuzziness": "AUTO"
                         }
                     }
                 }
             )
-
         # if mentions is not None:
         #     query["query"]["nested"] = {"path": "user", "query": {"bool": {
         #         "must": list(map(lambda x: {"match": {"user.id": x.id}}, mentions))}}}
         try:
-            res = self.ES.search(index=str(index), body=query)["hits"]["hits"]
+            res = await self.ES.search(index=str(index), body=query)
         except ConnectionError:
             return CONN_ERR
-        return res
+        return res["hits"]["hits"]
 
-    def search_message_id(self, message_id: int, index: int) -> List[Dict]:
+    async def search_message_id(self, message_id: int, index: int) -> List[Dict]:
         """
         Search for files by message id.
 
@@ -275,12 +257,12 @@ class ElasticSearchClient():
             }
         }
         try:
-            res = self.ES.search(index=str(index), body=query)["hits"]["hits"]
+            res = await self.ES.search(index=str(index), body=query)
         except ConnectionError:
             return CONN_ERR
-        return res
+        return res["hits"]["hits"]
 
-    def get_all_docs(self, index: int) -> str or List[Dict]:
+    async def get_all_docs(self, index: int) -> str or List[Dict]:
         """
         Get all docs in ES.
 
@@ -288,7 +270,7 @@ class ElasticSearchClient():
             index: The index of the pieces
         """
         try:
-            result = self.ES.search(
+            result = await self.ES.search(
                 index=str(index),
                 body={
                     "query": {
@@ -300,22 +282,32 @@ class ElasticSearchClient():
             return CONN_ERR
         return result["hits"]["hits"]
 
-    def get_all_indices(self):
+    async def get_all_indices(self):
         """Get all indices."""
         try:
-            res = self.ES.indices.get('*')
+            res = await self.ES.indices.get('*')
         except ConnectionError:
             return CONN_ERR
         return res
 
+    async def close(self):
+        """Close the AsyncElasticSearch object."""
+        res = await self.ES.close()
+        return res
+
+
+async def basic_tests():
+    """Run Basic tests."""
+    es = ElasticSearchClient()
+    await es.get_all_indices()
+    await es.create_index(0)
+    await es.clear_index(0)
+    await es.close()
 
 if __name__ == '__main__':
-    es = ElasticSearchClient(domain='http://localhost', port='8000')
-    print(es.get_all_indices())
-    print(es.get_all_docs(0))
-    print(es.search_message_id(0, 0))
-    print(es.search('bob', 0))
-    print(es.create_index(0))
-    print(es.clear_index(0))
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(basic_tests())
+    # loop.close()
     # print(es.check_if_doc_exists(discord.Attachment(), 0))
     # print(es.create_doc(discord.Message(state="", channel="", data=""), 0))

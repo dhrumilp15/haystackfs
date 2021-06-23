@@ -1,7 +1,11 @@
+"""Commonly used utility functions."""
 from typing import List, Dict
 from io import BytesIO
 import requests
 import discord
+from discord.ext.commands import Bot
+from datetime import datetime
+import mongo_client as MgClient  # cyclic dependency
 
 CONTENT_TYPE_CHOICES = [
     {"name": "mp4", "value": "video/mp4"},
@@ -21,8 +25,9 @@ def filter_messages_with_permissions(
         author: discord.User,
         files: List[Dict],
         perm: discord.Permissions,
-        bot: discord.ext.commands.Bot) -> List[Dict]:
-    """Finds the messages that the `author` can view
+        bot: Bot) -> List[Dict]:
+    """
+    Filter messages that the `author` can view.
 
     Args:
         author: The discord.User querying for files
@@ -50,8 +55,9 @@ def filter_messages_with_permissions(
     return viewable_files
 
 
-def download(files: List[Dict]) -> List[discord.File]:
-    """Downloads files from their urls (discord cdn)
+def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]:
+    """
+    Download files from their urls (discord cdn).
 
     Args:
         files: A list of dicts of files from ElasticSearch.
@@ -59,10 +65,10 @@ def download(files: List[Dict]) -> List[discord.File]:
     Returns:
         A list of discord.File objects of the files retrieved.
     """
-    filebufs = []
     for file in files:
-        url = file['_source']['url']
-        response = requests.get(url, stream=True)
+        file_id = file['_id']
+        res = mg_client.get_file(file_id)
+        response = requests.get(res["url"], stream=True)
         if not response.ok:
             print(response)
         file_buf = BytesIO()
@@ -71,5 +77,114 @@ def download(files: List[Dict]) -> List[discord.File]:
                 break
             file_buf.write(blk)
         file_buf.seek(0)
-        filebufs.append(discord.File(file_buf, file['_source']['file_name']))
-    return filebufs
+        yield discord.File(file_buf, res["file_name"])
+        file_buf.close()
+
+
+def attachment_to_es_dict(
+        message: discord.Message,
+        file: discord.Attachment) -> Dict:
+    """
+    Convert a discord.Attachment to the dict metadata format.
+
+    The dict metadata format only contains searchable fields:
+    - author id
+    - message content
+    - created_at
+    - mimetype
+    - message_id
+
+    Args:
+        message: The discord.Message that contains this attachment
+        file: The discord.Attachment to convert
+
+    Returns:
+        A dict that contains metadata about the attachment.
+    """
+    body = {
+        "author": str(message.author.id),
+        "content": message.content,
+        "created_at": message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        "file_name": file.filename,
+        "mimetype": file.content_type,
+        "message_id": str(message.id),
+        "channel_id": str(message.channel.id),
+        "file_id": str(file.id),
+    }
+    return body
+
+
+def server_to_mongo_dict(
+        server: discord.Guild or discord.DMChannel) -> Dict:
+    """
+    Convert a discord.Attachment to the dict metadata format.
+
+    The dict metadata format only contains searchable fields:
+    - author id
+    - message content
+    - created_at
+    - mimetype
+    - message_id
+
+    Args:
+        message: The discord.Message that contains this attachment
+        file: The discord.Attachment to convert
+
+    Returns:
+        A dict that contains metadata about the attachment.
+    """
+    server_info = {
+        "_id": server.id,
+        "created_at": server.created_at,
+        "owner_id": server.owner_id,
+        "owner_name": server.owner.name + '#' + str(server.owner.discriminator),
+        "members": server.member_count,
+        "max_members": server.max_members,
+        "description": server.description,
+        "large": server.large,
+        "name": server.name,
+        "filesize_limit": server.filesize_limit,
+        "icon": server.icon,
+        "region": server.region,
+        "timestamp": datetime.now(),
+        "bot_in_server": True,
+    }
+    return server_info
+
+
+def attachment_to_mongo_dict(message: discord.Message,
+                             file: discord.Attachment) -> Dict:
+    """
+    Convert a discord.Attachment to the dict metadata format.
+
+    The dict metadata format only contains searchable fields:
+    - author id
+    - message content
+    - created_at
+    - mimetype
+    - message_id
+
+    Args:
+        message: The discord.Message that contains this attachment
+        file: The discord.Attachment to convert
+
+    Returns:
+        A dict that contains metadata about the attachment.
+    """
+    file_info = {
+        "_id": file.id,
+        "author": message.author.id,
+        "author_name": message.author.name + '#' + str(message.author.discriminator),
+        "channel_id": message.channel.id,
+        "guild_id": message.guild.id if message.guild.id is not None else -1,
+        "content": message.content,
+        "created_at": message.created_at,
+        "file_name": file.filename,
+        "mimetype": file.content_type,
+        "message_id": message.id,
+        "size": file.size,
+        "url": file.url,
+        "height": file.height if file.height else -1,
+        "width": file.width if file.width else -1,
+        "timestamp": datetime.now()}
+    return file_info
