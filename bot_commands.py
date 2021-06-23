@@ -48,7 +48,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     removed_files = []
     for file in manageable_files:
         await es_client.delete_doc(file_id=file['_id'], index=serv_id)
-        res = mg_client.remove_file(file=file['_id'])
+        res = await mg_client.remove_file(file=file['_id'])
         if res:
             removed_files.append(file['_source']['file_name'])
     return removed_files
@@ -96,7 +96,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
     deleted_files = []
     for file in manageable_files:
         await es_client.delete_doc(file_id=file['_id'], index=channel_id)
-        res = mg_client.remove_file(file=file['_id'])
+        res = await mg_client.remove_file(file=file['_id'])
         try:
             onii_chan = bot.get_channel(int(file['_source']['channel_id']))
             message = await onii_chan.fetch_message(
@@ -195,7 +195,7 @@ async def fclear(es_client: ElasticSearchClient, mg_client: MgClient, index: str
         index: The index to clear
     """
     await es_client.clear_index(index)
-    mg_client.mass_remove_file(index)
+    await mg_client.mass_remove_file(index)
 
 
 def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):

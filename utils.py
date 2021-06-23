@@ -55,7 +55,7 @@ def filter_messages_with_permissions(
     return viewable_files
 
 
-def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]:
+async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]:
     """
     Download files from their urls (discord cdn).
 
@@ -67,7 +67,7 @@ def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]:
     """
     for file in files:
         file_id = file['_id']
-        res = mg_client.get_file(file_id)
+        res = await mg_client.get_file(file_id)
         response = requests.get(res["url"], stream=True)
         if not response.ok:
             print(response)

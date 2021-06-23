@@ -367,8 +367,7 @@ async def on_slash_command(ctx: SlashContext):
         serv = ctx.guild
 
     await es_client.create_index(serv.id)
-    res = mg_client.add_server(serv)
-    print(res)
+    await mg_client.add_server(serv)
 
 
 @bot.event
@@ -391,7 +390,7 @@ async def on_message(message: discord.Message):
         serv_id = message.guild.id
     await es_client.create_index(serv_id)
     await es_client.create_doc(message, serv_id)
-    res = mg_client.add_server(
+    res = await mg_client.add_server(
         message.guild if message.guild is not None else message.channel)
     if message.attachments:
         logger.info(
@@ -444,7 +443,7 @@ async def on_guild_join(guild: discord.Guild):
     Args:
         guild: The discord.Guild that the bot just joined
     """
-    mg_client.add_server(guild)
+    await mg_client.add_server(guild)
 
 
 @bot.event
@@ -455,7 +454,7 @@ async def on_guild_remove(guild: discord.Guild):
     Args:
         guild: The discord.Guild that the bot just joined
     """
-    mg_client.remove_server(guild)
+    await mg_client.remove_server(guild)
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
@@ -467,7 +466,7 @@ async def send_files_as_message(author: discord.User or SlashContext,
         author: The author or SlashContext of the search query
         files: A list of dicts of files returned from ElasticSearch
     """
-    file_buf = download(files, mg_client)
+    file_buf = await download(files, mg_client)
     for file in file_buf:
         await author.send(file=file)
         file.close()
