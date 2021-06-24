@@ -62,7 +62,7 @@ class MgClient:
                 f"Inserted new server: {res.inserted_id} with server id: {server.id}")
         else:
             logger.error(
-                f"Failed to insert new server: {res.inserted_id} with server id: {server.id}")
+                f"Failed to insert new server with server _id: {server.id}")
         return res.acknowledged
 
     async def remove_server(self, server: discord.Guild) -> bool:
@@ -76,7 +76,7 @@ class MgClient:
             Whether the remove operation was successful.
         """
         server_coll = self.db.servers
-        res = await server_coll.update_one({"guild_id": server.id}, {
+        res = await server_coll.update_one({"_id": server.id}, {
             '$set': {"bot_in_server": False}})
         if res.acknowledged:
             logger.info(
@@ -114,8 +114,7 @@ class MgClient:
                     f"Inserted new file: {res.inserted_id} with file id: {file.id}")
                 files_added += 1
             else:
-                logger.error(
-                    f"Failed to insert new file: {res.inserted_id} with file id: {file.id}")
+                logger.error(f"Failed to insert file with _id: {file.id}")
         return files_added
 
     async def remove_file(self, file_id: str):
@@ -150,11 +149,10 @@ class MgClient:
         res = await files_coll.delete_many({"guild_id": serv_id})
         if res.acknowledged:
             logger.info(
-                f"Deleted files: {res.deleted_count} with server/channel id: {serv_id}")
+                f"Deleted {res.deleted_count} files with guild_id: {serv_id}")
         else:
-            logger.error(
-                f"Failed to delete new file: {res.raw_result} with server/channel id: {serv_id}")
-        return res.acknowledged and res.deleted_count > 0
+            logger.error(f"Failed to delete files with guild_id: {serv_id}")
+        return res.acknowledged
 
 
 async def basic_tests():
