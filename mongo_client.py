@@ -80,10 +80,9 @@ class MgClient:
             '$set': {"bot_in_server": False}})
         if res.acknowledged:
             logger.info(
-                f"Marked the bot as not in server: {res.inserted_id} with server id: {server.id}")
+                f"Marked the bot as not in server {server.id} in {res.modified_count} docs")
         else:
-            logger.error(
-                f"Failed to mark bot as not in server: {res.inserted_id} with server id: {server.id}")
+            logger.error(f"Failed to mark the bot as not in server {server.id}")
         return res.acknowledged
 
     async def add_file(self, message: discord.Message) -> int:
@@ -132,11 +131,9 @@ class MgClient:
         files_coll = self.db.files
         res = await files_coll.delete_one({"_id": file_id})
         if res.acknowledged:
-            logger.info(
-                f"Deleted file: {res.raw_result} with file id: {file_id}")
+            logger.info(f"Deleted {res.deleted_count} docs with _id: {file_id}")
         else:
-            logger.error(
-                f"Failed to delete new file: {res.raw_result} with file id: {file_id}")
+            logger.error(f"Failed to delete file: {file_id}")
         return res.acknowledged
 
     async def mass_remove_file(self, serv_id: str):
