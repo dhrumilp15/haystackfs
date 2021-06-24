@@ -9,9 +9,7 @@ from discord_slash import SlashCommand, SlashContext
 from discord_slash.model import SlashCommandOptionType
 from discord_slash.utils.manage_commands import create_option, create_choice
 import logging
-import sys
-import argparse
-
+import traceback
 
 from config import CONFIG
 from bot_commands import fall, fdelete, fremove, fsearch, fclear
@@ -49,12 +47,17 @@ if CONFIG["DB_NAME"] == "production":
     TOKEN = CONFIG['DISCORD_TOKEN']
     guild_ids = []
 print(f'In {CONFIG["DB_NAME"]} mode')
+owner = None
 
 
 @bot.event
 async def on_ready():
     """Occurs when the discord client is ready."""
+    global owner
+    appinfo = await bot.application_info()
+    owner = appinfo.owner
     print(f'{bot.user} has connected to Discord!')
+    print(f'{owner} is my owner!')
 
 
 @slash.slash(
@@ -460,7 +463,9 @@ All I see is `{e}`. \
 If there was an issue in your query, please try again with any \
 necessary adjustments. \
 If you think there's an issue with the bot, \
-please message `dhrumilp15#4369`!""")
+please message `{owner}`!""")
+    if owner:
+        await owner.send(f"{type(e)}\n{e}")
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
