@@ -6,9 +6,10 @@ With `discordfs`, you can search for files in your server **by filename** with `
 
 Files you upload are *immediately* indexed so that you can search for files as soon as you send them.
 
-Use the last working version [here](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands).
+I've gotten so many requests for the bot that I've created a form! Sign up [here](https://forms.gle/UrhqHZNQhJHSdYpW7) and join the [community
+<!-- Use the last working version [here](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands). -->
 
-The testing version of this bot was recently up but I took it down to make sure it performed as expected.
+<!-- The testing version of this bot was recently up but I took it down to make sure it performed as expected. -->
 
 ## Commands
 
@@ -30,7 +31,7 @@ You can narrow your search by specifying options!
 - Message Content (file content coming soon!)
 - After / Before / During
 
-[Click here to add the bot to your server](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands)!
+<!-- [Click here to add the bot to your server](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands)! -->
 
 <!-- If you want to try out any experimental features, [click here to add the test bot to your server](https://discord.com/api/oauth2/authorize?client_id=841182898778275881&permissions=2147871808&scope=bot%20applications.commands)! -->
 
