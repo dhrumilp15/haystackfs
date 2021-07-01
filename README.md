@@ -13,13 +13,13 @@ I've gotten so many requests for the bot that I've created a form! Sign up for t
 
 ## Commands
 
-I really like Discord's Slash Commands, so the bot supports older commands (Ex. `!all`) and slash commands (Ex. `/all`)
+I really like Discord's Slash Commands, so the bot supports older commands (Ex. `fs!all`) and slash commands (Ex. `/all`)
 
-- `/search [filename]` : Search for a file by its filename. Check out [search options](#search-options) to narrow your search! (Also supports: `!fsearch`, `!s`, `!search`, `!fs`)
-- `/all` : Display all files that the bot can access (Also supports: `!all`, `!a`)
-- `/clear` : Clear all files from the index (This doesn't delete any files/messages in the actual server) (Also supports: `!clear`, `!c`)
-- `/remove [filename]` : Remove the bot's access to files named `filename` (Also supports: `!remove`, `!rm`)
-- `/delete [filename]` : Remove the bot's access to files named `filename` AND delete their respective messages (Also supports: `!delete`, `!del`)
+- `/search [filename]` : Search for a file by its filename. Check out [search options](#search-options) to narrow your search! (Also supports: `fs!fsearch`, `fs!s`, `fs!search`, `fs!fs`)
+- `/all` : Display all files that the bot can access (Also supports: `fs!all`, `fs!a`)
+- `/clear` : Clear all files from the index (This doesn't delete any files/messages in the actual server) (Also supports: `fs!clear`, `fs!c`)
+- `/remove [filename]` : Remove the bot's access to files named `filename` (Also supports: `fs!remove`, `fs!rm`)
+- `/delete [filename]` : Remove the bot's access to files named `filename` AND delete their respective messages (Also supports: `fs!delete`, `fs!del`)
 
 ## Search Options
 
