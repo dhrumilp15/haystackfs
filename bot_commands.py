@@ -1,18 +1,19 @@
 """The core functionality of the bot."""
+from search_client import AsyncSearchClient
 from mongo_client import MgClient
-from elasticsearch_client import ElasticSearchClient
+# from elasticsearch_client import ElasticSearchClient
 
 import discord
 from discord.ext import commands
 from discord_slash import SlashContext
 from typing import List, Dict
 
-from utils import filter_messages_with_permissions, attachment_to_es_dict
+from utils import filter_messages_with_permissions, attachment_to_search_dict
 
 
 async def fremove(ctx: SlashContext or commands.Context,
                   filename: str,
-                  es_client: ElasticSearchClient,
+                  search_client: AsyncSearchClient,
                   mg_client: MgClient,
                   bot: commands.Bot) -> List[str]:
     """
@@ -21,8 +22,8 @@ async def fremove(ctx: SlashContext or commands.Context,
     Args:
         ctx: The message's origin
         filename: The query for files to remove
-        es_client: The ElasticSearch client
-        es_client: The MongoDB client
+        search_client: The Search client
+        mg_client: The MongoDB client
         bot: The discord bot
 
     Returns:
@@ -35,7 +36,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     if ctx.guild is not None:
         serv_id = ctx.guild.id
 
-    files = await es_client.search(filename=filename, index=serv_id)
+    files = await search_client.search(filename=filename, index=serv_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -47,7 +48,7 @@ async def fremove(ctx: SlashContext or commands.Context,
         return f"I couldn't find any files related to `{filename}`"
     removed_files = []
     for file in manageable_files:
-        await es_client.delete_doc(file_id=file['_id'], index=serv_id)
+        await search_client.delete_doc(file_id=file['_id'], index=serv_id)
         res = await mg_client.remove_file(file['_id'])
         if res:
             removed_files.append(file['_source']['file_name'])
@@ -56,7 +57,7 @@ async def fremove(ctx: SlashContext or commands.Context,
 
 async def fdelete(ctx: SlashContext or commands.Context,
                   filename: str,
-                  es_client: ElasticSearchClient,
+                  search_client: AsyncSearchClient,
                   mg_client: MgClient,
                   bot: commands.Bot) -> List[str]:
     """
@@ -65,7 +66,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
     Args:
         ctx: The message's origin
         filename: The query for files to remove
-        es_client: The ElasticSearch client
+        search_client: The Search client
         mg_client: The MongoDB client
         bot: The discord bot
 
@@ -84,7 +85,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
         channel_id = ctx.channel.id
     else:
         channel_id = ctx.guild.id
-    files = await es_client.search(filename=filename, index=channel_id)
+    files = await search_client.search(filename=filename, index=channel_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -97,7 +98,7 @@ async def fdelete(ctx: SlashContext or commands.Context,
 
     deleted_files = []
     for file in manageable_files:
-        await es_client.delete_doc(file_id=file['_id'], index=channel_id)
+        await search_client.delete_doc(file_id=file['_id'], index=channel_id)
         res = await mg_client.remove_file(file['_id'])
         try:
             onii_chan = bot.get_channel(int(file['_source']['channel_id']))
@@ -113,14 +114,14 @@ async def fdelete(ctx: SlashContext or commands.Context,
 
 
 async def fall(ctx: SlashContext or commands.Context,
-               es_client: ElasticSearchClient,
+               search_client: AsyncSearchClient,
                bot: commands.Bot) -> List[Dict]:
     """
     Find all docs in ElasticSearch.
 
     Args:
         ctx: The message's origin
-        es_client: The ElasticSearch client
+        search_client: The Search client
         bot: The discord bot
 
     Returns:
@@ -130,10 +131,11 @@ async def fall(ctx: SlashContext or commands.Context,
     serv_id = ctx.channel.id
     if ctx.guild is not None:
         serv_id = ctx.guild.id
-
-    files = await es_client.get_all_docs(serv_id)
+    files = await search_client.get_all_docs(serv_id)
     if not files:
         return "The archives are empty... Perhaps you could contribute..."
+    if isinstance(files, str):
+        return files
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -145,14 +147,18 @@ async def fall(ctx: SlashContext or commands.Context,
     return manageable_files
 
 
-async def fsearch(ctx: SlashContext or commands.Context, filename: str, es_client: ElasticSearchClient, bot: commands.Bot, **kwargs) -> List[Dict]:
+async def fsearch(ctx: SlashContext or commands.Context,
+                  filename: str,
+                  search_client: AsyncSearchClient,
+                  bot: commands.Bot,
+                  **kwargs) -> List[Dict]:
     """
     Find docs related to a query in ElasticSearch.
 
     Args:
         ctx: The message's origin
         filename: The query
-        es_client: The ElasticSearch client
+        search_client: The Search client
         bot: The discord bot
 
     Returns:
@@ -164,10 +170,9 @@ async def fsearch(ctx: SlashContext or commands.Context, filename: str, es_clien
     onii_chan = ctx.channel
     if ctx.guild is not None:
         onii_chan = ctx.guild
-
-    files = await es_client.search(
+    files = await search_client.search(
         filename=filename,
-        index=onii_chan.id,
+        serv_id=onii_chan.id,
         **kwargs
     )
     # past_files = await past_search(ctx, filename, bot, **kwargs)
@@ -187,16 +192,16 @@ async def fsearch(ctx: SlashContext or commands.Context, filename: str, es_clien
     return manageable_files
 
 
-async def fclear(es_client: ElasticSearchClient, mg_client: MgClient, index: str):
+async def fclear(search_client: AsyncSearchClient, mg_client: MgClient, index: str):
     """
     Clear a channel or server id.
 
     Args:
-        es_client: The ElasticSearch client
+        search_client: The Search client
         mg_client: The MongoDB client
         index: The index to clear
     """
-    await es_client.clear_index(index)
+    await search_client.clear_index(index)
     await mg_client.mass_remove_file(index)
 
 
@@ -249,7 +254,6 @@ async def past_search(
     Args:
         ctx: The message's origin
         filename: The query
-        es_client: The ElasticSearch client
         bot: The discord bot
 
     Returns:

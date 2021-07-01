@@ -39,7 +39,7 @@ def filter_messages_with_permissions(
     """
     viewable_files = []
     for file in files:
-        file_chan_id = int(file['_source']['channel_id'])
+        file_chan_id = int(file['channel_id'])
         file_message_chan = bot.get_channel(file_chan_id)
         if isinstance(file_message_chan, discord.DMChannel):
             viewable_files.append(file)
@@ -66,7 +66,7 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
         A list of discord.File objects of the files retrieved.
     """
     for file in files:
-        file_id = file['_id']
+        file_id = file['objectID']
         res = await mg_client.get_file(file_id)
         # Found file in elasticsearch but not mongodb
         # This happens when testing results overlap with production results
@@ -74,6 +74,7 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
         # testing
         if not res:
             continue
+        print(res)
         response = requests.get(res["url"], stream=True)
         if not response.ok:
             print(response)
@@ -87,7 +88,7 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
         file_buf.close()
 
 
-def attachment_to_es_dict(
+def attachment_to_search_dict(
         message: discord.Message,
         file: discord.Attachment) -> Dict:
     """
@@ -96,26 +97,25 @@ def attachment_to_es_dict(
     The dict metadata format only contains searchable fields:
     - author id
     - message content
-    - created_at
     - mimetype
     - message_id
+    - channel_id
 
     Args:
         message: The discord.Message that contains this attachment
-        file: The discord.Attachment to convert
+        file: The discord.Attachment to convert to a dict.
 
     Returns:
         A dict that contains metadata about the attachment.
     """
     body = {
-        "author": str(message.author.id),
+        "objectID": file.id,
+        "author_id": message.author.id,
         "content": message.content,
-        "created_at": message.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "file_name": file.filename,
         "mimetype": file.content_type,
-        "message_id": str(message.id),
-        "channel_id": str(message.channel.id),
-        "file_id": str(file.id),
+        "message_id": message.id,
+        "channel_id": message.channel.id,
     }
     return body
 

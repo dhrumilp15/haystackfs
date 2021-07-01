@@ -2,10 +2,11 @@ discord.py
 python-dotenv
 discord-py-slash-command
 elasticsearch>=7.8.0
-aiohttp
-asyncio
 motor
-tornado
 requests
 dnspython
-pymongo
+python-dateutil
+algoliasearch>=2.0,<3.0
+asyncio>=3.4,<4.0
+aiohttp>=2.0,<4.0
+async_timeout>=2.0,<4.0
