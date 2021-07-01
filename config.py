@@ -1,6 +1,7 @@
 """Stores the config variables."""
 
 from dotenv.main import dotenv_values
+from types import SimpleNamespace
 
 
 # def try_int(value: str):
@@ -28,6 +29,8 @@ MONGO_USER
 MONGO_PASSWD
 MONGO_ENDPOINT
 DB_NAME
+ALGOLIA_APP_ID
+ALGOLIA_SEARCH_KEY
+ALGOLIA_ADMIN_KEY
 """
-CONFIG = dotenv_values(".env")
-# CONFIG = {k: try_int(v) for k, v in dotenv_values(".env").items()}
+CONFIG = SimpleNamespace(**dotenv_values(".env"))

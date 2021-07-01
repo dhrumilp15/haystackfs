@@ -29,8 +29,8 @@ class ElasticSearchClient():
             self.ES = self.connect(domain, port)
         else:
             self.ES = self.connect(
-                CONFIG["ELASTIC_DOMAIN"],
-                CONFIG["ELASTIC_PORT"])
+                CONFIG.ELASTIC_DOMAIN,
+                CONFIG.ELASTIC_PORT)
         # self.last_snapshot = None
         # snapshot_body = {
         #     "type": "url", "settings": {

@@ -1,8 +1,10 @@
 """MongoDB Client."""
 import logging
 import motor.motor_asyncio
-from config import CONFIG
 import discord
+from typing import List, Dict
+
+from config import CONFIG
 import utils
 # import utils.server_to_mongo_dict as server_to_mongo_dict
 # import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
@@ -20,8 +22,8 @@ class MgClient:
     def __init__(self):
         """Initialize the MongoDB Client and database."""
         self.client = motor.motor_asyncio.AsyncIOMotorClient(
-            CONFIG["MONGO_ENDPOINT"])
-        self.db = self.client[CONFIG["DB_NAME"]]
+            CONFIG.MONGO_ENDPOINT)
+        self.db = self.client[CONFIG.DB_NAME]
         logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
 
     async def get_file(self, file_id: int) -> dict:
