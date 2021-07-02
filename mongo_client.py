@@ -67,7 +67,7 @@ class MgClient:
                 f"Failed to insert new server with server _id: {server.id}")
         return res.acknowledged
 
-    async def remove_server(self, server: discord.Guild) -> bool:
+    async def remove_server(self, server_id: int) -> bool:
         """
         Mark the bot as not in this server.
 
@@ -78,13 +78,13 @@ class MgClient:
             Whether the remove operation was successful.
         """
         server_coll = self.db.servers
-        res = await server_coll.update_one({"_id": server.id}, {
+        res = await server_coll.update_one({"_id": server_id}, {
             '$set': {"bot_in_server": False}})
         if res.acknowledged:
             logger.info(
-                f"Marked the bot as not in server {server.id} in {res.modified_count} docs")
+                f"Marked the bot as not in server {server_id} in {res.modified_count} docs")
         else:
-            logger.error(f"Failed to mark the bot as not in server {server.id}")
+            logger.error(f"Failed to mark the bot as not in server {server_id}")
         return res.acknowledged
 
     async def add_file(self, message: discord.Message) -> int:
@@ -155,6 +155,14 @@ class MgClient:
         else:
             logger.error(f"Failed to delete files with guild_id: {serv_id}")
         return res.acknowledged
+
+    async def verify(self, serv_id: int):
+        """Verify a server."""
+        res = await self.db.servers.find_one(
+            {"_id": serv_id},
+            {"verified": 1}
+        )
+        return res["verified"]
 
 
 async def basic_tests():

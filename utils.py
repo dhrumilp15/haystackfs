@@ -1,6 +1,7 @@
 """Commonly used utility functions."""
 from typing import List, Dict
 from io import BytesIO
+from discord.ext.commands.core import command
 import requests
 import discord
 from discord.ext.commands import Bot
@@ -19,6 +20,8 @@ CONTENT_TYPE_CHOICES = [
     {"name": "mp3/m4a", "value": "audio/mpeg"},
     {"name": "OTHER", "value": "OTHER"}
 ]
+
+PLZ_VERIFY = "Please verify this server at: https://forms.gle/UrhqHZNQhJHSdYpW7"
 
 
 def filter_messages_with_permissions(

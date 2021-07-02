@@ -1,7 +1,8 @@
 .env
-
-*.rst
 __pycache__
 .vscode
+
+*.yaml
+*.rst
 *.txt
 *.log

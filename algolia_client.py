@@ -103,6 +103,11 @@ class AlgoliaClient(AsyncSearchClient):
         res = await index.search_async('')
         return res['hits']
 
+    async def clear(self, serv_id: int):
+        """Clear an index."""
+        index = self.admin_client.init_index(serv_id)
+        await index.clear_async()
+
 
 if __name__ == "__main__":
     ag_client = AlgoliaClient()

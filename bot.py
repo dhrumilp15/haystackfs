@@ -12,7 +12,7 @@ import logging
 
 from config import CONFIG
 from bot_commands import fall, fdelete, fremove, fsearch, fclear
-from utils import attachment_to_search_dict, download, CONTENT_TYPE_CHOICES
+from utils import PLZ_VERIFY, attachment_to_search_dict, download, CONTENT_TYPE_CHOICES
 from mongo_client import MgClient
 from algolia_client import AlgoliaClient
 
@@ -67,10 +67,14 @@ async def on_ready():
 )
 async def _clear(ctx: SlashContext):
     await ctx.defer()
-    if ctx.guild_id is None:
-        await fclear(ag_client, ctx.channel_id)
-    else:
-        await fclear(ag_client, ctx.guild_id)
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
+    await fclear(ag_client, serv.id)
     await ctx.send(content="Index cleared", hidden=True)
 
 
@@ -93,8 +97,14 @@ async def _all(ctx: SlashContext, dm: bool = False):
         ctx: The SlashContext from which the command originated
         DM: A bool for whether to dm the author the results.
     """
-    print("I received the All Command")
     await ctx.defer()
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     files = await fall(ctx, ag_client, bot)
     if isinstance(files, str):
         await ctx.send(files, hidden=True)
@@ -194,6 +204,13 @@ async def _search(ctx: SlashContext,
         DM: A bool for whether to dm the author the results.
     """
     await ctx.defer()
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
 
     if filetype == "OTHER" and custom_filetype is None:
         await ctx.send(f"You specified a custom filetype but didn't provide one!")
@@ -255,6 +272,13 @@ async def _delete(ctx, filename):
         filename: A str of the filename to query for.
     """
     await ctx.defer()
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     deleted_files = await fdelete(ctx, filename, ag_client, mg_client, bot)
     if isinstance(deleted_files, str):
         await ctx.send(content=deleted_files, hidden=True)
@@ -284,6 +308,13 @@ async def _remove(ctx: SlashContext, filename: str):
         filename: A str of the filename to query for.
     """
     await ctx.defer()
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     removed_files = await fremove(ctx, filename, ag_client, mg_client, bot)
     if isinstance(removed_files, str):
         await ctx.send(content=removed_files, hidden=True)
@@ -300,6 +331,13 @@ async def search(ctx: commands.Context, filename: str):
         ctx: The commands.Context from which the command originated
         filename: A str of the filename to query for.
     """
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     files = await fsearch(ctx, filename, ag_client, bot)
     if isinstance(files, str):
         await ctx.author.send(content=files)
@@ -310,6 +348,13 @@ async def search(ctx: commands.Context, filename: str):
 @bot.command(name="clear", aliases=["c"], pass_context=True)
 async def clear(ctx: commands.Context):
     """Clear the index associated with the current id."""
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     if ctx.message.guild is not None:
         await fclear(ag_client, mg_client, ctx.message.guild.id)
     else:
@@ -324,6 +369,13 @@ async def all_docs(ctx: commands.Context):
     Args:
         ctx: The commands.Context from which the command originated
     """
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     files = await fall(ctx, ag_client, bot)
     if isinstance(files, str):
         await ctx.send(files)
@@ -341,6 +393,13 @@ async def delete(ctx: commands.Context, filename: str):
         ctx: The commands.Context from which the command originated
         filename: A str of the filename to query for
     """
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     deleted_files = await fdelete(ctx, filename, ag_client, mg_client, bot)
     if isinstance(deleted_files, str):
         await ctx.author.send(deleted_files)
@@ -357,6 +416,13 @@ async def remove(ctx, filename):
         ctx: The commands.Context from which the command originated
         filename: A str of the filename to query for
     """
+    serv = ctx.channel
+    if ctx.guild:
+        serv = ctx.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     removed_files = await fremove(ctx, filename, ag_client, mg_client, bot)
     if isinstance(removed_files, str):
         await ctx.author.send(removed_files)
@@ -370,7 +436,10 @@ async def on_slash_command(ctx: SlashContext):
     serv = ctx.channel
     if ctx.guild_id is not None:
         serv = ctx.guild
-
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await ctx.send(PLZ_VERIFY)
+        return
     await mg_client.add_server(serv)
 
 
@@ -392,14 +461,22 @@ async def on_message(message: discord.Message):
     serv = message.channel
     if message.guild is not None:
         serv = message.guild
+    res = await mg_client.verify(serv.id)
+    if not res:
+        await message.channel.send(PLZ_VERIFY)
+        return
     await mg_client.add_server(serv)
-
-    for file in message.attachments:
-        meta_dict = attachment_to_search_dict(message, file)
-        await ag_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
-        saved_files = await mg_client.add_file(message)
-        if saved_files:
-            await message.channel.send(f"Saved {len(message.attachments)} file{'s' if len(message.attachments) > 1 else ''}")
+    if message.attachments:
+        verify_result = await mg_client.verify(serv.id)
+        if not verify_result:
+            await message.channel.send("Please validate this server at: https://forms.gle/UrhqHZNQhJHSdYpW7")
+            return
+        for file in message.attachments:
+            meta_dict = attachment_to_search_dict(message, file)
+            await ag_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
+            saved_files = await mg_client.add_file(message)
+            if saved_files:
+                await message.channel.send(f"Saved {len(message.attachments)} file{'s' if len(message.attachments) > 1 else ''}")
 
     await bot.process_commands(message)
 
@@ -452,7 +529,8 @@ async def on_guild_remove(guild: discord.Guild):
     Args:
         guild: The discord.Guild that the bot just joined
     """
-    await mg_client.remove_server(guild)
+    await mg_client.remove_server(guild.id)
+    await ag_client.clear(guild.id)
 
 
 @bot.event
