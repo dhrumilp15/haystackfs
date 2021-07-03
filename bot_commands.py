@@ -127,23 +127,26 @@ async def fall(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    author = ctx.author
-    serv_id = ctx.channel.id
-    if ctx.guild is not None:
-        serv_id = ctx.guild.id
-    files = await search_client.get_all_docs(serv_id)
-    if not files:
-        return "The archives are empty... Perhaps you could contribute..."
-    if isinstance(files, str):
-        return files
-    manageable_files = filter_messages_with_permissions(
-        author,
-        files,
-        discord.Permissions(read_message_history=True),
-        bot
-    )
-    if not manageable_files:
-        return "I couldn't find any files that you can access"
+    try:
+        author = ctx.author
+        serv_id = ctx.channel.id
+        if ctx.guild is not None:
+            serv_id = ctx.guild.id
+        files = await search_client.get_all_docs(serv_id)
+        if not files:
+            return "The archives are empty... Perhaps you could contribute..."
+        if isinstance(files, str):
+            return files
+        manageable_files = filter_messages_with_permissions(
+            author,
+            files,
+            discord.Permissions(read_message_history=True),
+            bot
+        )
+        if not manageable_files:
+            return "I couldn't find any files that you can access"
+    except BaseException as e:
+        print(e)
     return manageable_files
 
 

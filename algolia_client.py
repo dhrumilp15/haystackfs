@@ -1,5 +1,6 @@
 """A Search Client for Algolia."""
 from algoliasearch.search_client import SearchClient
+from algoliasearch.exceptions import RequestException
 from config import CONFIG
 from search_client import AsyncSearchClient
 from typing import List, Dict
@@ -51,13 +52,16 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Search results.
         """
-        index = self.search_client.init_index(serv_id)
+        index = self.search_client.init_index(
+            CONFIG.DB_NAME + '_' + str(serv_id))
         filters = self.create_filter(**kwargs)
-
-        res = await index.search_async(filename, {
-            "advancedSyntax": True,
-            "filters": filters
-        })
+        try:
+            res = await index.search_async(filename, {
+                "advancedSyntax": True,
+                "filters": filters
+            })
+        except RequestException:
+            return []
         return res["hits"]
 
     async def create_doc(self, meta_dict: dict, serv_id: int, author: str) -> bool:
@@ -71,7 +75,8 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Whether the operation was executed.
         """
-        index = self.admin_client.init_index(serv_id)
+        index = self.admin_client.init_index(
+            CONFIG.DB_NAME + '_' + str(serv_id))
         res = await index.save_object_async(meta_dict, {
             "autoGenerateObjectIDIfNotExist": False,
             "X-Algolia-UserToken": author
@@ -92,21 +97,27 @@ class AlgoliaClient(AsyncSearchClient):
         """
         docs = await self.search(filename, **kwargs)
         ids = [doc["objectID"] for doc in docs]
-        index = self.admin_client.init_index(serv_id)
+        index = self.admin_client.init_index(
+            CONFIG.DB_NAME + '_' + str(serv_id))
         res = index.delete_objects_async(ids, {
             "X-Algolia-UserToken": author
         })
         return bool(res)
 
-    async def get_all_docs(self, serv_id: int):
+    async def get_all_docs(self, serv_id: int) -> List[Dict]:
         """Retrieve all docs in an index."""
-        index = self.search_client.init_index(serv_id)
-        res = await index.search_async('')
+        index = self.search_client.init_index(
+            CONFIG.DB_NAME + '_' + str(serv_id))
+        try:
+            res = await index.search_async('')
+        except RequestException:
+            return []
         return res['hits']
 
     async def clear(self, serv_id: int):
         """Clear an index."""
-        index = self.admin_client.init_index(str(serv_id))
+        index = self.admin_client.init_index(
+            CONFIG.DB_NAME + '_' + str(serv_id))
         res = await index.clear_objects_async()
 
 
