@@ -201,7 +201,7 @@ async def fclear(search_client: AsyncSearchClient, mg_client: MgClient, index: s
         mg_client: The MongoDB client
         index: The index to clear
     """
-    await search_client.clear_index(index)
+    await search_client.clear(index)
     await mg_client.mass_remove_file(index)
 
 

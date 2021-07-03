@@ -49,7 +49,8 @@ class AlgoliaClient(AsyncSearchClient):
             serv_id: The id of the server/channel to search in.
 
         Returns:
-            Search results."""
+            Search results.
+        """
         index = self.search_client.init_index(serv_id)
         filters = self.create_filter(**kwargs)
 
@@ -105,8 +106,8 @@ class AlgoliaClient(AsyncSearchClient):
 
     async def clear(self, serv_id: int):
         """Clear an index."""
-        index = self.admin_client.init_index(serv_id)
-        await index.clear_async()
+        index = self.admin_client.init_index(str(serv_id))
+        res = await index.clear_objects_async()
 
 
 if __name__ == "__main__":

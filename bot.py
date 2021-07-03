@@ -74,7 +74,7 @@ async def _clear(ctx: SlashContext):
     if not res:
         await ctx.send(PLZ_VERIFY)
         return
-    await fclear(ag_client, serv.id)
+    await fclear(ag_client, mg_client, serv.id)
     await ctx.send(content="Index cleared", hidden=True)
 
 
@@ -558,5 +558,7 @@ async def send_files_as_message(author: discord.User or SlashContext,
     async for file in download(files, mg_client):
         await author.send(file=file)
         file.close()
-
-bot.run(TOKEN)
+try:
+    bot.run(TOKEN)
+except BaseException as e:
+    print(e)
