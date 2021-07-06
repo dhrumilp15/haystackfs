@@ -475,8 +475,9 @@ async def on_message(message: discord.Message):
             meta_dict = attachment_to_search_dict(message, file)
             await ag_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
             saved_files = await mg_client.add_file(message)
-            if saved_files:
-                await message.channel.send(f"Saved {len(message.attachments)} file{'s' if len(message.attachments) > 1 else ''}")
+            # if saved_files:
+            # await message.channel.send(f"Saved {len(message.attachments)}
+            # file{'s' if len(message.attachments) > 1 else ''}")
 
     await bot.process_commands(message)
 
