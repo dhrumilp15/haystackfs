@@ -162,6 +162,7 @@ def server_to_mongo_dict(
         "region": server.region,
         "timestamp": datetime.now(),
         "bot_in_server": True,
+        "verified": False
     }
     return server_info
 
