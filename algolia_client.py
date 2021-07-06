@@ -60,7 +60,7 @@ class AlgoliaClient(AsyncSearchClient):
                 "advancedSyntax": True,
                 "filters": filters
             })
-        except RequestException:
+        except RequestException as err:
             return []
         return res["hits"]
 

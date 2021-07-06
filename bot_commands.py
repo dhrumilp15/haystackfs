@@ -242,7 +242,7 @@ def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):
             if attachment.content_type != kwargs["mimetype"]:
                 continue
         if filename in attachment.filename:
-            res.append(attachment_to_es_dict(attachment))
+            res.append(attachment_to_search_dict(attachment))
     return res
 
 
