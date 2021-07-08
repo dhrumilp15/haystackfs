@@ -119,22 +119,18 @@ class MgClient:
                 logger.error(f"Failed to insert file with _id: {file.id}")
         return files_added
 
-    async def remove_file(self, file_id: str):
+    async def remove_file(self, file_ids: List[str]):
         """
-        Remove a file.
+        Remove files.
 
         Args:
-            file: The id of the file to remove
+            file_ids: A list of file ids to remove.
 
         Returns:
             Whether the file was succesfully removed.
         """
         files_coll = self.db.files
-        res = await files_coll.delete_one({"_id": file_id})
-        if res.acknowledged:
-            logger.info(f"Deleted {res.deleted_count} docs with _id: {file_id}")
-        else:
-            logger.error(f"Failed to delete file: {file_id}")
+        res = await files_coll.delete_many({"_id": {"$in": file_ids}})
         return res.acknowledged
 
     async def mass_remove_file(self, serv_id: str):

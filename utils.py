@@ -70,17 +70,14 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
     """
     for file in files:
         file_id = file['objectID']
-        print(file_id)
         try:
             res = await mg_client.get_file(file_id)
-            print(res)
             # Found file in elasticsearch but not mongodb
             # This happens when testing results overlap with production results
             # since we use the same elasticsearch instance for production and
             # testing
             if not res:
                 continue
-            print(res)
         except BaseException as e:
             print(e)
         response = requests.get(res["url"], stream=True)

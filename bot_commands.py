@@ -7,6 +7,8 @@ import discord
 from discord.ext import commands
 from discord_slash import SlashContext
 from typing import List, Dict
+import traceback
+import sys
 
 from utils import filter_messages_with_permissions, attachment_to_search_dict
 
@@ -46,13 +48,17 @@ async def fremove(ctx: SlashContext or commands.Context,
     )
     if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
-    removed_files = []
-    for file in manageable_files:
-        await search_client.delete_doc(file_id=file['_id'], index=serv_id)
-        res = await mg_client.remove_file(file['_id'])
-        if res:
-            removed_files.append(file['_source']['file_name'])
-    return removed_files
+    res = await search_client.remove_doc(
+        [file['objectID'] for file in manageable_files],
+        serv_id,
+        author.name + "#" + author.discriminator
+    )
+    if not res.get('objectIDs'):
+        return []
+    res = await mg_client.remove_file([file['objectID'] for file in manageable_files])
+    if not res:
+        return []
+    return manageable_files
 
 
 async def fdelete(ctx: SlashContext or commands.Context,
@@ -76,16 +82,10 @@ async def fdelete(ctx: SlashContext or commands.Context,
     author = ctx.author
     if not filename:
         return f"Couldn't process your query: `{filename}`"
-
-    if isinstance(
-            ctx.channel,
-            discord.DMChannel) or isinstance(
-            ctx.channel,
-            discord.GroupChannel):
-        channel_id = ctx.channel.id
-    else:
-        channel_id = ctx.guild.id
-    files = await search_client.search(filename=filename, index=channel_id)
+    serv_id = ctx.channel.id
+    if ctx.guild is not None:
+        serv_id = ctx.guild.id
+    files = await search_client.search(filename, serv_id)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -95,19 +95,19 @@ async def fdelete(ctx: SlashContext or commands.Context,
     )
     if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
-
     deleted_files = []
+    await search_client.remove_doc(
+        [file['objectID'] for file in manageable_files],
+        serv_id,
+        author.name + "#" + author.discriminator
+    )
+    await mg_client.remove_file([file['objectID'] for file in manageable_files])
     for file in manageable_files:
-        await search_client.delete_doc(file_id=file['_id'], index=channel_id)
-        res = await mg_client.remove_file(file['_id'])
         try:
-            onii_chan = bot.get_channel(int(file['_source']['channel_id']))
-            message = await onii_chan.fetch_message(
-                file['_source']['message_id']
-            )
+            onii_chan = bot.get_channel(int(file['channel_id']))
+            message = await onii_chan.fetch_message(file['message_id'])
             await message.delete()
-            if res:
-                deleted_files.append(file['_source']['file_name'])
+            deleted_files.append(file['file_name'])
         except discord.Forbidden:
             continue
     return deleted_files
@@ -127,26 +127,22 @@ async def fall(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    try:
-        author = ctx.author
-        serv_id = ctx.channel.id
-        if ctx.guild is not None:
-            serv_id = ctx.guild.id
-        files = await search_client.get_all_docs(serv_id)
-        if not files:
-            return "The archives are empty... Perhaps you could contribute..."
-        if isinstance(files, str):
-            return files
-        manageable_files = filter_messages_with_permissions(
-            author,
-            files,
-            discord.Permissions(read_message_history=True),
-            bot
-        )
-        if not manageable_files:
-            return "I couldn't find any files that you can access"
-    except BaseException as e:
-        print(e)
+    serv_id = ctx.channel.id
+    if ctx.guild is not None:
+        serv_id = ctx.guild.id
+    files = await search_client.get_all_docs(serv_id)
+    if not files:
+        return "The archives are empty... Perhaps you could contribute..."
+    if isinstance(files, str):
+        return files
+    manageable_files = filter_messages_with_permissions(
+        ctx.author,
+        files,
+        discord.Permissions(read_message_history=True),
+        bot
+    )
+    if not manageable_files:
+        return "I couldn't find any files that you can access"
     return manageable_files
 
 
@@ -262,7 +258,6 @@ async def past_search(
     Returns:
         A list of dicts of viewable files.
     """
-    print(kwargs)
     files = []
     print("Started searching on previous files")
     matched_messages = await ctx.channel.history(limit=100, before=kwargs["before"], after=kwargs["after"]).flatten()
