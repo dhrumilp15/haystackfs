@@ -100,7 +100,6 @@ class ElasticSearchClient():
             snapshot=self.last_snapshot,
             wait_for_completion=True,
         )
-        print(res)
 
     def restore_from_snapshot(self):
         """Restore from last snapshot."""

@@ -115,8 +115,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
-        await ctx.send(content=f"Found {len(files)} file{'s' if len(files) > 1 else ''}", hidden=True)
-        await send_files_as_message(ctx.channel, files)
+        await send_files_as_message(ctx, files)
 
 
 @slash.slash(
@@ -243,10 +242,8 @@ async def _search(ctx: SlashContext,
         await ctx.send(content=files, hidden=True)
         return
     if dm:
-        await ctx.author.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx.author, files)
     else:
-        await ctx.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx, files)
 
 
@@ -495,6 +492,8 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     """
     if payload.cached_message is None:
         onii_chan_id = payload.channel_id
+        onii_chan = bot.get_channel(onii_chan_id)
+        message = onii_chan.get_message(payload.message_id)
     else:
         message = payload.cached_message
         # if the message is cached, we'll know whether the author is a bot user
@@ -503,12 +502,8 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         onii_chan_id = message.channel.id
         if message.guild is not None:
             onii_chan_id = message.guild.id
-
-    files = await ag_client.search_message_id(
-        message_id=payload.message_id, index=onii_chan_id)
-
-    for file in files:
-        await ag_client.delete_doc(file['_id'], onii_chan_id)
+    files = await ag_client.search(payload.message_id, onii_chan_id)
+    await ag_client.remove_doc([file['objectID'] for file in files], onii_chan_id, message.author)
 
 
 @bot.event
@@ -559,7 +554,5 @@ async def send_files_as_message(author: discord.User or SlashContext,
     async for file in download(files, mg_client):
         await author.send(file=file)
         file.close()
-try:
-    bot.run(TOKEN)
-except BaseException as e:
-    print(e)
+
+bot.run(TOKEN)
