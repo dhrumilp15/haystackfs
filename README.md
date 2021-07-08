@@ -7,7 +7,7 @@ With `discordfs`, you can search for files in your server **by filename** with `
 Files you upload are *immediately* indexed so that you can search for files as soon as you send them.
 
 I've gotten so many requests for the bot that I've created a form! Sign up for the bot [here](https://forms.gle/UrhqHZNQhJHSdYpW7) and join the [community](https://discord.gg/rp8aZSjevn)!
-<!-- Use the last working version [here](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands). -->
+Use the last working version [here](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands). You'll have to complete the form to verify your server and use the bot!
 
 <!-- The testing version of this bot was recently up but I took it down to make sure it performed as expected. -->
 
