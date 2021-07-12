@@ -16,23 +16,24 @@ from utils import PLZ_VERIFY, attachment_to_search_dict, download, CONTENT_TYPE_
 from mongo_client import MgClient
 from algolia_client import AlgoliaClient
 
-discordlogger = logging.getLogger('discord')
-discordlogger.setLevel(logging.DEBUG)
+import discord
+import logging
+
+dlogger = logging.getLogger('discord')
+dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(
     filename='discord.log',
     encoding='utf-8',
     mode='w')
-handler.setFormatter(
-    logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-)
-discordlogger.addHandler(handler)
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+handler.setFormatter(formatter)
+dlogger.addHandler(handler)
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format='%(asctime)s: %(levelname)s:%(message)s',
-    filename='out.log',
-    level=logging.DEBUG)
-
+logger.setLevel(logging.INFO)
+fh = logging.FileHandler('main.log', encoding='utf-8', mode='w')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
 bot = commands.Bot(command_prefix='fs!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -466,7 +467,6 @@ async def on_message(message: discord.Message):
     if message.attachments:
         verify_result = await mg_client.verify(serv.id)
         if not verify_result:
-            await message.channel.send("Please validate this server at: https://forms.gle/UrhqHZNQhJHSdYpW7")
             return
         for file in message.attachments:
             meta_dict = attachment_to_search_dict(message, file)
@@ -526,6 +526,7 @@ async def on_guild_remove(guild: discord.Guild):
         guild: The discord.Guild that the bot just joined
     """
     await mg_client.remove_server(guild.id)
+    await mg_client.remove_server_docs(guild.id)
     await ag_client.clear(guild.id)
 
 
@@ -534,10 +535,8 @@ async def on_command_error(ctx, e):
     """Command Error Handler."""
     await ctx.author.send(f"""I had some trouble understanding that query. \
 All I see is `{e}`. \
-If there was an issue in your query, please try again with any \
-necessary adjustments. \
-If you think there's an issue with the bot, \
-please message `{owner}`!""")
+If there was an issue in your query, please try again. \
+If you think there's an issue with the bot, please message `{owner}`!""")
     if owner:
         await owner.send(f"{type(e)}\n{e}")
 

@@ -4,11 +4,9 @@ from mongo_client import MgClient
 # from elasticsearch_client import ElasticSearchClient
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord_slash import SlashContext
 from typing import List, Dict
-import traceback
-import sys
 
 from utils import filter_messages_with_permissions, attachment_to_search_dict
 

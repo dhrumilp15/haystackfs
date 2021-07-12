@@ -8,12 +8,7 @@ from config import CONFIG
 import utils
 # import utils.server_to_mongo_dict as server_to_mongo_dict
 # import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
-
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format='%(asctime)s: {%(filename)s:%(funcName)s:%(lineno)d} - %(levelname)s: %(message)s',
-    filename='mg_client.log',
-    level=logging.DEBUG)
 
 
 class MgClient:
@@ -85,6 +80,20 @@ class MgClient:
                 f"Marked the bot as not in server {server_id} in {res.modified_count} docs")
         else:
             logger.error(f"Failed to mark the bot as not in server {server_id}")
+        return res.acknowledged
+
+    async def remove_server_docs(self, server_id: int) -> bool:
+        """
+        Remove any docs from a server.
+
+        Args:
+            guild: The guild to remove docs from.
+
+        Returns:
+            Whether the remove operation was successful.
+        """
+        files_coll = self.db.files
+        res = await files_coll.delete_many({"guild_id": server_id})
         return res.acknowledged
 
     async def add_file(self, message: discord.Message) -> int:
