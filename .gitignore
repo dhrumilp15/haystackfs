@@ -4,5 +4,4 @@ __pycache__
 
 *.yaml
 *.rst
-*.txt
 *.log
