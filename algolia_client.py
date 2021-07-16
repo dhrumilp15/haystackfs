@@ -52,17 +52,20 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Search results.
         """
-        index = self.search_client.init_index(
-            CONFIG.DB_NAME + '_' + str(serv_id))
-        filters = self.create_filter(**kwargs)
-        try:
-            res = await index.search_async(filename, {
-                "advancedSyntax": True,
-                "filters": filters
-            })
-        except RequestException as err:
-            return []
-        return res["hits"]
+        async with self.search_client as client:
+            index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
+            filters = self.create_filter(**kwargs)
+            try:
+                res = await index.search_async(filename, {
+                    "advancedSyntax": True,
+                    "filters": filters
+                })
+                try:
+                    return (await res)['hits']
+                except BaseException as e:
+                    return res["hits"]
+            except RequestException as err:
+                return []
 
     async def create_doc(self, meta_dict: dict, serv_id: int, author: str) -> bool:
         """
