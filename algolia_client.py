@@ -62,9 +62,12 @@ class AlgoliaClient(AsyncSearchClient):
                     "advancedSyntax": True,
                     "filters": filters
                 })
+                try:
+                    return (await res)['hits']
+                except BaseException as e:
+                    return res["hits"]
             except RequestException as err:
                 return []
-            return res["hits"]
 
     async def create_doc(self, meta_dict: dict, serv_id: int, author: str) -> bool:
         """

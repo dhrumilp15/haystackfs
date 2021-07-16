@@ -24,11 +24,7 @@ CONTENT_TYPE_CHOICES = [
 PLZ_VERIFY = "Please verify this server at: https://forms.gle/UrhqHZNQhJHSdYpW7"
 
 
-def filter_messages_with_permissions(
-        author: discord.User,
-        files: List[Dict],
-        perm: discord.Permissions,
-        bot: Bot) -> List[Dict]:
+def filter_messages_with_permissions(author: discord.User, files: List[Dict], perm: discord.Permissions, bot: Bot) -> List[Dict]:
     """
     Filter messages that the `author` can view.
 
@@ -69,18 +65,20 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
         A list of discord.File objects of the files retrieved.
     """
     for file in files:
-        file_id = file['objectID']
-        try:
-            res = await mg_client.get_file(file_id)
-            # Found file in elasticsearch but not mongodb
-            # This happens when testing results overlap with production results
-            # since we use the same elasticsearch instance for production and
-            # testing
-            if not res:
-                continue
-        except BaseException as e:
-            print(e)
-        response = requests.get(res["url"], stream=True)
+        url = file.get('url')
+        filename = file.get('file_name')
+        if not url:
+            file_id = file['objectID']
+            try:
+                res = await mg_client.get_file(file_id)
+                if not res:
+                    print("Empty response from Mongo")
+                    continue
+                url = res['url']
+                filename = res['file_name']
+            except BaseException as e:
+                print(e)
+        response = requests.get(url, stream=True)
         if not response.ok:
             print(response)
         file_buf = BytesIO()
@@ -89,13 +87,11 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
                 break
             file_buf.write(blk)
         file_buf.seek(0)
-        yield discord.File(file_buf, res["file_name"])
+        yield discord.File(file_buf, filename)
         file_buf.close()
 
 
-def attachment_to_search_dict(
-        message: discord.Message,
-        file: discord.Attachment) -> Dict:
+def attachment_to_search_dict(message: discord.Message, file: discord.Attachment) -> Dict:
     """
     Convert a discord.Attachment to the dict metadata format.
 
@@ -125,8 +121,7 @@ def attachment_to_search_dict(
     return body
 
 
-def server_to_mongo_dict(
-        server: discord.Guild or discord.DMChannel) -> Dict:
+def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
     """
     Convert a discord.Attachment to the dict metadata format.
 
@@ -164,8 +159,7 @@ def server_to_mongo_dict(
     return server_info
 
 
-def attachment_to_mongo_dict(message: discord.Message,
-                             file: discord.Attachment) -> Dict:
+def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment) -> Dict:
     """
     Convert a discord.Attachment to the dict metadata format.
 
