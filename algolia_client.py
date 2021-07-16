@@ -1,6 +1,8 @@
 """A Search Client for Algolia."""
+import asyncio
 from algoliasearch.search_client import SearchClient
 from algoliasearch.exceptions import RequestException
+from discord.guild import BanEntry
 from config import CONFIG
 from search_client import AsyncSearchClient
 from typing import List, Dict
@@ -78,15 +80,15 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Whether the operation was executed.
         """
-        index = self.admin_client.init_index(
-            CONFIG.DB_NAME + '_' + str(serv_id))
-        res = await index.save_object_async(meta_dict, {
-            "autoGenerateObjectIDIfNotExist": False,
-            "X-Algolia-UserToken": author
-        })
-        return bool(res)
+        async with self.admin_client as client:
+            index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
+            res = await index.save_object_async(meta_dict, {
+                "autoGenerateObjectIDIfNotExist": False,
+                "X-Algolia-UserToken": author
+            })
+            return bool(res)
 
-    async def remove_doc(self, filename: str, serv_id: int, author: str, **kwargs) -> bool:
+    async def remove_doc(self, ids: List[str], serv_id: int, author: str, **kwargs) -> bool:
         """
         Remove docs.
 
@@ -98,32 +100,27 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Whether the remove operation succeeded.
         """
-        docs = await self.search(filename, **kwargs)
-        ids = [doc["objectID"] for doc in docs]
-        index = self.admin_client.init_index(
-            CONFIG.DB_NAME + '_' + str(serv_id))
-        res = index.delete_objects_async(ids, {
-            "X-Algolia-UserToken": author
-        })
-        return bool(res)
+        async with self.admin_client as client:
+            index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
+            res = await index.delete_objects_async(ids, {
+                "X-Algolia-UserToken": author
+            })
+            return res
 
     async def get_all_docs(self, serv_id: int) -> List[Dict]:
         """Retrieve all docs in an index."""
-        index = self.search_client.init_index(
-            CONFIG.DB_NAME + '_' + str(serv_id))
-        try:
+        async with self.search_client as client:
+            index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             res = await index.search_async('')
-        except RequestException:
-            return []
-        return res['hits']
+            return res['hits']
 
     async def clear(self, serv_id: int):
         """Clear an index."""
-        index = self.admin_client.init_index(
-            CONFIG.DB_NAME + '_' + str(serv_id))
-        res = await index.clear_objects_async()
+        async with self.admin_client as client:
+            index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
+            res = await index.clear_objects_async()
+            return res
 
 
 if __name__ == "__main__":
     ag_client = AlgoliaClient()
-    ag_client.show_indices()

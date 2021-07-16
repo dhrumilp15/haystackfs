@@ -8,7 +8,6 @@ from config import CONFIG
 import utils
 # import utils.server_to_mongo_dict as server_to_mongo_dict
 # import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
@@ -87,6 +86,20 @@ class MgClient:
             logger.error(f"Failed to mark the bot as not in server {server_id}")
         return res.acknowledged
 
+    async def remove_server_docs(self, server_id: int) -> bool:
+        """
+        Remove any docs from a server.
+
+        Args:
+            guild: The guild to remove docs from.
+
+        Returns:
+            Whether the remove operation was successful.
+        """
+        files_coll = self.db.files
+        res = await files_coll.delete_many({"guild_id": server_id})
+        return res.acknowledged
+
     async def add_file(self, message: discord.Message) -> int:
         """
         Add a file to the `files` collection.
@@ -119,22 +132,18 @@ class MgClient:
                 logger.error(f"Failed to insert file with _id: {file.id}")
         return files_added
 
-    async def remove_file(self, file_id: str):
+    async def remove_file(self, file_ids: List[str]):
         """
-        Remove a file.
+        Remove files.
 
         Args:
-            file: The id of the file to remove
+            file_ids: A list of file ids to remove.
 
         Returns:
             Whether the file was succesfully removed.
         """
         files_coll = self.db.files
-        res = await files_coll.delete_one({"_id": file_id})
-        if res.acknowledged:
-            logger.info(f"Deleted {res.deleted_count} docs with _id: {file_id}")
-        else:
-            logger.error(f"Failed to delete file: {file_id}")
+        res = await files_coll.delete_many({"_id": {"$in": file_ids}})
         return res.acknowledged
 
     async def mass_remove_file(self, serv_id: str):

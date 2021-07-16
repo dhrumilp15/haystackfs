@@ -4,7 +4,7 @@ from mongo_client import MgClient
 # from elasticsearch_client import ElasticSearchClient
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord_slash import SlashContext
 from typing import List, Dict
 
@@ -49,13 +49,17 @@ async def fremove(ctx: SlashContext or commands.Context,
     )
     if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
-    removed_files = []
-    for file in manageable_files:
-        await search_client.delete_doc(file_id=file['_id'], index=serv_id)
-        res = await mg_client.remove_file(file['_id'])
-        if res:
-            removed_files.append(file['_source']['file_name'])
-    return removed_files
+    res = await search_client.remove_doc(
+        [file['objectID'] for file in manageable_files],
+        serv_id,
+        author.name + "#" + author.discriminator
+    )
+    if not res.get('objectIDs'):
+        return []
+    res = await mg_client.remove_file([file['objectID'] for file in manageable_files])
+    if not res:
+        return []
+    return manageable_files
 
 
 async def fdelete(ctx: SlashContext or commands.Context,
@@ -91,19 +95,19 @@ async def fdelete(ctx: SlashContext or commands.Context,
     )
     if not manageable_files:
         return f"I couldn't find any files related to `{filename}`"
-
     deleted_files = []
+    await search_client.remove_doc(
+        [file['objectID'] for file in manageable_files],
+        serv_id,
+        author.name + "#" + author.discriminator
+    )
+    await mg_client.remove_file([file['objectID'] for file in manageable_files])
     for file in manageable_files:
-        await search_client.delete_doc(file_id=file['_id'], index=channel_id)
-        res = await mg_client.remove_file(file['_id'])
         try:
-            onii_chan = bot.get_channel(int(file['_source']['channel_id']))
-            message = await onii_chan.fetch_message(
-                file['_source']['message_id']
-            )
+            onii_chan = bot.get_channel(int(file['channel_id']))
+            message = await onii_chan.fetch_message(file['message_id'])
             await message.delete()
-            if res:
-                deleted_files.append(file['_source']['file_name'])
+            deleted_files.append(file['file_name'])
         except discord.Forbidden:
             continue
     return deleted_files
@@ -251,7 +255,6 @@ async def past_search(
     Returns:
         A list of dicts of viewable files.
     """
-    print(kwargs)
     files = []
     # fcounter = 0
     # mcounter = 0

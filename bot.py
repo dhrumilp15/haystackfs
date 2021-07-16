@@ -15,6 +15,8 @@ from dateutil import parser
 from typing import List, Dict
 
 
+import discord
+import logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(
@@ -27,11 +29,10 @@ handler.setFormatter(
 dlogger.addHandler(handler)
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format='%(asctime)s: %(levelname)s:%(message)s',
-    filename='out.log',
-    level=logging.DEBUG)
-
+logger.setLevel(logging.INFO)
+fh = logging.FileHandler('main.log', encoding='utf-8', mode='w')
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
 bot = commands.Bot(command_prefix='fs!', intents=discord.Intents.all())
 slash = SlashCommand(bot, sync_commands=True)
@@ -114,8 +115,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
-        await ctx.send(content=f"Found {len(files)} file{'s' if len(files) > 1 else ''}", hidden=True)
-        await send_files_as_message(ctx.channel, files)
+        await send_files_as_message(ctx, files)
 
 
 @slash.slash(
@@ -242,10 +242,8 @@ async def _search(ctx: SlashContext,
         await ctx.send(content=files, hidden=True)
         return
     if dm:
-        await ctx.author.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx.author, files)
     else:
-        await ctx.send(f"Found {len(files)} file{'s' if len(files) > 1 else ''}")
         await send_files_as_message(ctx, files)
 
 
@@ -468,14 +466,14 @@ async def on_message(message: discord.Message):
     if message.attachments:
         verify_result = await mg_client.verify(serv.id)
         if not verify_result:
-            await message.channel.send("Please validate this server at: https://forms.gle/UrhqHZNQhJHSdYpW7")
             return
         for file in message.attachments:
             meta_dict = attachment_to_search_dict(message, file)
             await ag_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
             saved_files = await mg_client.add_file(message)
-            if saved_files:
-                await message.channel.send(f"Saved {len(message.attachments)} file{'s' if len(message.attachments) > 1 else ''}")
+            # if saved_files:
+            # await message.channel.send(f"Saved {len(message.attachments)}
+            # file{'s' if len(message.attachments) > 1 else ''}")
 
     await bot.process_commands(message)
 
@@ -503,12 +501,8 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
         onii_chan_id = message.channel.id
         if message.guild is not None:
             onii_chan_id = message.guild.id
-
-    files = await ag_client.search_message_id(
-        message_id=payload.message_id, index=onii_chan_id)
-
-    for file in files:
-        await ag_client.delete_doc(file['_id'], onii_chan_id)
+    files = await ag_client.search(payload.message_id, onii_chan_id)
+    await ag_client.remove_doc([file['objectID'] for file in files], onii_chan_id, message.author)
 
 
 @bot.event
@@ -531,6 +525,7 @@ async def on_guild_remove(guild: discord.Guild):
         guild: The discord.Guild that the bot just joined
     """
     await mg_client.remove_server(guild.id)
+    await mg_client.remove_server_docs(guild.id)
     await ag_client.clear(guild.id)
 
 
@@ -539,10 +534,8 @@ async def on_command_error(ctx, e):
     """Command Error Handler."""
     await ctx.author.send(f"""I had some trouble understanding that query. \
 All I see is `{e}`. \
-If there was an issue in your query, please try again with any \
-necessary adjustments. \
-If you think there's an issue with the bot, \
-please message `{owner}`!""")
+If there was an issue in your query, please try again. \
+If you think there's an issue with the bot, please message `{owner}`!""")
     if owner:
         await owner.send(f"{type(e)}\n{e}")
 
@@ -559,7 +552,5 @@ async def send_files_as_message(author: discord.User or SlashContext,
     async for file in download(files, mg_client):
         await author.send(file=file)
         file.close()
-try:
-    bot.run(TOKEN)
-except BaseException as e:
-    print(e)
+
+bot.run(TOKEN)
