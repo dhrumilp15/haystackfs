@@ -23,8 +23,9 @@ handler = logging.FileHandler(
     filename='discord.log',
     encoding='utf-8',
     mode='w')
-formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-handler.setFormatter(formatter)
+handler.setFormatter(
+    logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+)
 dlogger.addHandler(handler)
 
 logger = logging.getLogger(__name__)
@@ -491,7 +492,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if payload.cached_message is None:
         onii_chan_id = payload.channel_id
         onii_chan = bot.get_channel(onii_chan_id)
-        message = await onii_chan.fetch_message(payload.message_id)
+        message = onii_chan.fetch_message(payload.message_id)
     else:
         message = payload.cached_message
         # if the message is cached, we'll know whether the author is a bot user
