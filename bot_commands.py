@@ -172,7 +172,7 @@ async def fsearch(ctx: SlashContext or commands.Context,
         serv_id=onii_chan.id,
         **kwargs
     )
-    algolia_file_ids = {file['objectID'] for file in files}
+    algolia_file_ids = {int(file['objectID']) for file in files}
     past_files = await past_search(ctx, filename, bot, banned_ids=algolia_file_ids, **kwargs)
 
     files.extend(list(past_files))
