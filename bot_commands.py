@@ -9,6 +9,9 @@ from discord_slash import SlashContext
 from typing import List, Dict
 
 from utils import filter_messages_with_permissions, attachment_to_search_dict
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
+import time
 
 
 async def fremove(ctx: SlashContext or commands.Context,
@@ -84,7 +87,6 @@ async def fdelete(ctx: SlashContext or commands.Context,
     if ctx.guild is not None:
         serv_id = ctx.guild.id
     files = await search_client.search(filename, serv_id)
-
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -131,8 +133,6 @@ async def fall(ctx: SlashContext or commands.Context,
     files = await search_client.get_all_docs(serv_id)
     if not files:
         return "The archives are empty... Perhaps you could contribute..."
-    if isinstance(files, str):
-        return files
     manageable_files = filter_messages_with_permissions(
         ctx.author,
         files,
@@ -172,9 +172,10 @@ async def fsearch(ctx: SlashContext or commands.Context,
         serv_id=onii_chan.id,
         **kwargs
     )
-    # past_files = await past_search(ctx, filename, bot, **kwargs)
-    # files.extend(past_files)
+    algolia_file_ids = {int(file['objectID']) for file in files}
+    past_files = await past_search(ctx, filename, bot, banned_ids=algolia_file_ids, **kwargs)
 
+    files.extend(list(past_files))
     if not files:
         return f"I couldn't find any files related to your query"
 
@@ -202,7 +203,7 @@ async def fclear(search_client: AsyncSearchClient, mg_client: MgClient, index: s
     await mg_client.mass_remove_file(index)
 
 
-def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):
+def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs) -> List[discord.Attachment]:
     """
     Match the message against possible arguments.
 
@@ -211,13 +212,12 @@ def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):
         kwargs: kwargs of args to match
 
     Returns:
-        True if the message matches
+        A list of discord.Attachments that match the query.
     """
-    res = []
     if not message.attachments or message.author == bot.user:
         return []
     if kwargs.get("content"):
-        if kwargs["content"] not in message.content:
+        if fuzz.partial_ratio(kwargs['content'].lower(), message.content.lower()) < 85:
             return []
     if kwargs.get("after"):
         if message.created_at < kwargs["after"]:
@@ -231,20 +231,20 @@ def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs):
     if kwargs.get("channel"):
         if message.channel != kwargs["channel"]:
             return []
-    for attachment in message.attachments:
-        if kwargs.get("mimetype"):
-            if attachment.content_type != kwargs["mimetype"]:
-                continue
-        if filename in attachment.filename:
-            res.append(attachment_to_search_dict(attachment))
-    return res
+
+    res = filter(lambda atch: fuzz.partial_ratio(atch.filename.lower(), filename.lower()) > 85, message.attachments)
+    if kwargs.get("mimetype"):
+        return [attachment for attachment in res if attachment.content_type == kwargs["mimetype"]]
+    if kwargs.get("banned_ids"):
+        return [attachment for attachment in res if attachment.id not in kwargs["banned_ids"]]
+    return list(res)
 
 
 async def past_search(
         ctx: SlashContext or commands.Context,
         filename: str,
         bot: commands.Bot,
-        **kwargs) -> List[discord.Attachment]:
+        **kwargs) -> List[Dict]:
     """
     Iterate through previous messages in a discord channel for files.
 
@@ -257,9 +257,26 @@ async def past_search(
         A list of dicts of viewable files.
     """
     files = []
-    print("Started searching on previous files")
-    matched_messages = await ctx.channel.history(limit=100, before=kwargs["before"], after=kwargs["after"]).flatten()
-    print(f"Grabbed {len(matched_messages)} messages")
-    for message in matched_messages:
-        files.extend(match(message, bot=bot, filename=filename, kwargs=kwargs))
+    # fcounter = 0
+    # mcounter = 0
+    # start = time.time()
+    matched_messages = ctx.channel.history(limit=int(1e9), before=kwargs.get("before"), after=kwargs.get("after"))
+    # avg_attachment_time = 0
+    # avg_match_time = 0
+    # avg_join_time = 0
+    async for message in matched_messages:
+        # fcounter += len(message.attachments)
+        # st = time.time()
+        matched = match(message, bot, filename, **kwargs)
+        # avg_match_time += (time.time() - st) / 1000
+        # print(f"{avg_match_time}s for {len(message.attachments)} files")
+        # s = time.time()
+        files.extend([{**attachment_to_search_dict(message, atch), **
+                     {'url': atch.url, 'jump_url': message.jump_url}} for atch in matched])
+    #     avg_join_time += (time.time() - s) / 1000.0
+    #     avg_attachment_time += (time.time() - st)
+    #     mcounter += 1
+    # print(f"Took {(time.time() - start) / 1000} seconds to match {len(files)} attachments out of {fcounter} attachments and {mcounter} messages.")
+    # print(f"Avg. time / attachment: {(avg_attachment_time / 1000) / fcounter} seconds")
+    # print(f"Avg. match time: {avg_match_time / fcounter} seconds")
     return files

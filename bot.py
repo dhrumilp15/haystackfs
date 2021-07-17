@@ -1,20 +1,18 @@
 """Main Bot Controller."""
-from typing import List, Dict
-from dateutil import parser
-import datetime
-
-import discord
-from discord.ext import commands, menus
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.model import SlashCommandOptionType
-from discord_slash.utils.manage_commands import create_option, create_choice
-import logging
-
-from config import CONFIG
-from bot_commands import fall, fdelete, fremove, fsearch, fclear
-from utils import PLZ_VERIFY, attachment_to_search_dict, download, CONTENT_TYPE_CHOICES
-from mongo_client import MgClient
 from algolia_client import AlgoliaClient
+from mongo_client import MgClient
+from utils import PLZ_VERIFY, attachment_to_search_dict, download, CONTENT_TYPE_CHOICES
+from bot_commands import fall, fdelete, fremove, fsearch, fclear
+from config import CONFIG
+import logging
+from discord_slash.utils.manage_commands import create_option, create_choice
+from discord_slash.model import SlashCommandOptionType
+from discord_slash import SlashCommand, SlashContext
+from discord.ext import commands, menus
+import discord
+import datetime
+from dateutil import parser
+from typing import List, Dict
 
 
 dlogger = logging.getLogger('discord')
@@ -503,7 +501,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if payload.cached_message is None:
         onii_chan_id = payload.channel_id
         onii_chan = bot.get_channel(onii_chan_id)
-        message = onii_chan.get_message(payload.message_id)
+        message = await onii_chan.fetch_message(payload.message_id)
     else:
         message = payload.cached_message
         # if the message is cached, we'll know whether the author is a bot user
