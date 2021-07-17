@@ -172,9 +172,8 @@ async def fsearch(ctx: SlashContext or commands.Context,
         serv_id=onii_chan.id,
         **kwargs
     )
-    algolia_file_ids = {file['objectID'] for file in files}
-    past_files = await past_search(ctx, filename, bot, **kwargs)
-    past_files = filter(lambda file: file['objectID'] not in algolia_file_ids, past_files)
+    algolia_file_ids = {int(file['objectID']) for file in files}
+    past_files = await past_search(ctx, filename, bot, banned_ids=algolia_file_ids, **kwargs)
 
     files.extend(list(past_files))
     if not files:
@@ -236,6 +235,8 @@ def match(message: discord.Message, bot: commands.Bot, filename: str, **kwargs) 
     res = filter(lambda atch: fuzz.partial_ratio(atch.filename.lower(), filename.lower()) > 85, message.attachments)
     if kwargs.get("mimetype"):
         return [attachment for attachment in res if attachment.content_type == kwargs["mimetype"]]
+    if kwargs.get("banned_ids"):
+        return [attachment for attachment in res if attachment.id not in kwargs["banned_ids"]]
     return list(res)
 
 
