@@ -44,7 +44,6 @@ TOKEN = CONFIG.TEST_DISCORD_TOKEN
 guild_ids = [int(CONFIG.GUILD_ID)]
 if CONFIG.DB_NAME == "production":
     TOKEN = CONFIG.DISCORD_TOKEN
-    guild_ids = []
 print(f'In {CONFIG.DB_NAME} mode')
 owner = None
 
@@ -57,6 +56,7 @@ async def on_ready():
     owner = appinfo.owner
     print(f'{bot.user} has connected to Discord!')
     print(f'{owner} is my owner!')
+    print(f'Guild ids: {guild_ids}')
 
 
 @slash.slash(
@@ -181,7 +181,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
             required=False,
         ),
     ],
-    guild_ids=guild_ids
+    guild_ids=guild_ids if CONFIG.DB_NAME == "testing" else []
 )
 async def _search(ctx: SlashContext,
                   filename: str,
@@ -257,7 +257,7 @@ async def _search(ctx: SlashContext,
             required=True,
         )
     ],
-    guild_ids=guild_ids
+    guild_ids=guild_ids if CONFIG.DB_NAME == "testing" else []
 )
 async def _delete(ctx, filename):
     """
@@ -293,7 +293,7 @@ async def _delete(ctx, filename):
             option_type=SlashCommandOptionType.STRING,
             required=True,
         )],
-    guild_ids=guild_ids
+    guild_ids=guild_ids if CONFIG.DB_NAME == "testing" else []
 )
 async def _remove(ctx: SlashContext, filename: str):
     """
@@ -347,6 +347,9 @@ async def clear(ctx: commands.Context):
     serv = ctx.channel
     if ctx.guild:
         serv = ctx.guild
+    if serv.id not in guild_ids:
+        ctx.send("Clear is too dangerous to be used...")
+        return
     res = await mg_client.verify(serv.id)
     if not res:
         await ctx.send(PLZ_VERIFY)
@@ -368,6 +371,9 @@ async def all_docs(ctx: commands.Context):
     serv = ctx.channel
     if ctx.guild:
         serv = ctx.guild
+    if serv.id not in guild_ids:
+        ctx.send("All is too spammy to be used...")
+        return
     res = await mg_client.verify(serv.id)
     if not res:
         await ctx.send(PLZ_VERIFY)
