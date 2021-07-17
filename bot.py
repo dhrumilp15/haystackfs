@@ -457,10 +457,6 @@ async def on_message(message: discord.Message):
     serv = message.channel
     if message.guild is not None:
         serv = message.guild
-    res = await mg_client.verify(serv.id)
-    if not res:
-        await message.channel.send(PLZ_VERIFY)
-        return
     await mg_client.add_server(serv)
     if message.attachments:
         verify_result = await mg_client.verify(serv.id)
