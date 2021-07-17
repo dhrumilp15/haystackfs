@@ -74,7 +74,7 @@ async def _clear(ctx: SlashContext):
         await ctx.send(PLZ_VERIFY)
         return
     await fclear(ag_client, mg_client, serv.id)
-    await ctx.channel.send(content="Index cleared", hidden=True)
+    await ctx.send(content="Index cleared", hidden=True)
 
 
 @slash.slash(
@@ -114,7 +114,7 @@ async def _all(ctx: SlashContext, dm: bool = False):
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
-        await send_files_as_message(ctx.channel, files)
+        await send_files_as_message(ctx, files)
 
 
 @slash.slash(
@@ -243,7 +243,7 @@ async def _search(ctx: SlashContext,
     if dm:
         await send_files_as_message(ctx.author, files)
     else:
-        await send_files_as_message(ctx.channel, files)
+        await send_files_as_message(ctx, files)
 
 
 @slash.slash(
@@ -279,7 +279,7 @@ async def _delete(ctx, filename):
     if isinstance(deleted_files, str):
         await ctx.send(content=deleted_files, hidden=True)
         return
-    await ctx.channel.send(content=f"Deleted {' '.join(deleted_files)}", hidden=True)
+    await ctx.send(content=f"Deleted {' '.join(deleted_files)}", hidden=True)
 
 
 @slash.slash(
@@ -315,7 +315,7 @@ async def _remove(ctx: SlashContext, filename: str):
     if isinstance(removed_files, str):
         await ctx.send(content=removed_files, hidden=True)
         return
-    await ctx.channel.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
+    await ctx.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
 
 
 @bot.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
@@ -491,7 +491,7 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
     if payload.cached_message is None:
         onii_chan_id = payload.channel_id
         onii_chan = bot.get_channel(onii_chan_id)
-        message = onii_chan.fetch_message(payload.message_id)
+        message = await onii_chan.fetch_message(payload.message_id)
     else:
         message = payload.cached_message
         # if the message is cached, we'll know whether the author is a bot user
