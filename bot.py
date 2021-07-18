@@ -13,10 +13,9 @@ import discord
 import datetime
 from dateutil import parser
 from typing import List, Dict
+import glob
 
 
-import discord
-import logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(
@@ -544,10 +543,12 @@ If you think there's an issue with the bot, please message `{owner}`!""")
 @tasks.loop(hours=24)
 async def clear_irrelevant_docs():
     """Run a simple cleaner every 24 hours."""
-    ack, frickedup = await mg_client.delete_files_from_inactive_servers()
-    if not frickedup:
-        await owner.send(f"YOU JUST DELETED THE ENTIRE FILES COLLECTION! LOAD FROM MOST RECENT SNAPSHOT: \
-            {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}")
+    ack, ok = await mg_client.delete_files_from_inactive_servers()
+    if not ok:
+        logger.error("Deleted every element in the collection, restoring the database now...")
+        snaps = sorted(glob.glob(f"{CONFIG.DB_NAME}_files/*"), reverse=True)[0]
+        await mg_client.load_from_snapshot(snaps)
+        logger.debug("Database restored!")
 
 
 async def send_files_as_message(author: discord.User or SlashContext,
