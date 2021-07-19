@@ -260,7 +260,8 @@ async def past_search(
     # fcounter = 0
     # mcounter = 0
     # start = time.time()
-    matched_messages = ctx.channel.history(limit=int(1e9), before=kwargs.get("before"), after=kwargs.get("after"))
+    onii_chan = kwargs.get("channel", ctx.channel)
+    matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get("before"), after=kwargs.get("after"))
     # avg_attachment_time = 0
     # avg_match_time = 0
     # avg_join_time = 0
