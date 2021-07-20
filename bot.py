@@ -37,10 +37,10 @@ slash = SlashCommand(bot, sync_commands=True)
 ag_client = AlgoliaClient()
 mg_client = MgClient()
 
-TOKEN = CONFIG.TEST_DISCORD_TOKEN
+TOKEN = CONFIG.DISCORD_TOKEN
 guild_ids = [int(CONFIG.GUILD_ID)]
-if CONFIG.DB_NAME == "production":
-    TOKEN = CONFIG.DISCORD_TOKEN
+if CONFIG.DB_NAME == "testing":
+    TOKEN = CONFIG.TEST_DISCORD_TOKEN
 print(f'In {CONFIG.DB_NAME} mode')
 owner = None
 
