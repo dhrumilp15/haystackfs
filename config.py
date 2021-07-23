@@ -17,4 +17,14 @@ ALGOLIA_APP_ID
 ALGOLIA_SEARCH_KEY
 ALGOLIA_ADMIN_KEY
 """
-CONFIG = SimpleNamespace(**dotenv_values(find_dotenv()))
+
+class Config(SimpleNamespace):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __contains__(self, key):
+        return key in self.__dict__
+
+CONFIG = Config(**dotenv_values(find_dotenv()))
+
+assert 'DISCORD_TOKEN' in CONFIG, "DISCORD_TOKEN must be set in .env"
