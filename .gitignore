@@ -5,3 +5,8 @@ __pycache__
 *.yaml
 *.rst
 *.log
+
+testing_files
+production_files
+*/*.json
+*.json
