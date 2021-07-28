@@ -8,7 +8,7 @@ import logging
 from discord_slash.utils.manage_commands import create_option, create_choice
 from discord_slash.model import SlashCommandOptionType
 from discord_slash import SlashCommand, SlashContext
-from discord.ext import commands, tasks
+from discord.ext import commands, tasks, menus
 import discord
 import datetime
 from dateutil import parser
@@ -20,6 +20,7 @@ dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+
 handler.setFormatter(formatter)
 dlogger.addHandler(handler)
 
@@ -36,10 +37,10 @@ slash = SlashCommand(bot, sync_commands=True)
 ag_client = AlgoliaClient()
 mg_client = MgClient()
 
-TOKEN = CONFIG.TEST_DISCORD_TOKEN
+TOKEN = CONFIG.DISCORD_TOKEN
 guild_ids = [int(CONFIG.GUILD_ID)]
-if CONFIG.DB_NAME == "production":
-    TOKEN = CONFIG.DISCORD_TOKEN
+if CONFIG.DB_NAME == "testing":
+    TOKEN = CONFIG.TEST_DISCORD_TOKEN
 print(f'In {CONFIG.DB_NAME} mode')
 owner = None
 
@@ -80,10 +81,15 @@ async def _clear(ctx: SlashContext):
             name="dm",
             description="Whether I should dm you what I find",
             option_type=SlashCommandOptionType.BOOLEAN,
+            required=False),
+        create_option(
+            name="multipage embed?",
+            description="Whether I should send the files in the form of a multipage embed",
+            option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
     guild_ids=guild_ids
 )
-async def _all(ctx: SlashContext, dm: bool = False):
+async def _all(ctx: SlashContext, dm: bool = False, multipageEmbed: bool = False):
     """
     Responds to `/all`. Tries to display all docs from the Search Client.
 
@@ -100,9 +106,15 @@ async def _all(ctx: SlashContext, dm: bool = False):
         await ctx.send("Found no messages", hidden=True)
         return
     if dm:
-        await send_files_as_message(ctx.author, files)
+        if multipageEmbed:
+            await send_files_as_multipage_embed(ctx.author, files)
+        else:
+            await send_files_as_message(ctx.author, files)
     else:
-        await send_files_as_message(ctx, files)
+        if multipageEmbed:
+            await send_files_as_multipage_embed(ctx, files)
+        else:
+            await send_files_as_message(ctx, files)
 
 
 @slash.slash(
@@ -487,5 +499,47 @@ async def send_files_as_message(author: discord.User or SlashContext,
     async for file in download(files, mg_client):
         await author.send(file=file)
         file.close()
+
+
+class MultiPageEmbed(menus.ListPageSource):
+    async def format_page(self, menu, entry):
+        return entry
+
+
+@bot.command()
+async def send_files_as_multipage_embed(author: SlashContext, fileData: List[Dict], mg_client: MgClient):
+    """
+    Send files to the author of the message in the form of a multipage embed.
+
+    Args:
+        author: The author or SlashContext of the search query
+        fileData: A list of dicts of files returned from ElasticSearch
+    """
+    embeds = []
+    itemCount = len(fileData)
+    for idx, file in enumerate(fileData):
+        filename = file.get('file_name')
+        mediaUrl = file.get('url')
+        if not mediaUrl:
+            file_id = file['objectID']
+            res = await mg_client.get_file(file_id)
+            mediaUrl = res['url']
+
+        if (idx % 4 == 0):
+            embeds.append(
+                discord.Embed(
+                    title="Page {} of {}".format(idx//4 + 1, (itemCount+4)//4),
+                    description="Here is what we found:",
+                    color=discord.Color.blue()
+                )
+            )
+            embeds[idx//4].set_thumbnail(url="https://cdn.discordapp.com/icons/812818660141170748/e63de9317f410ce558d4580d3bd3a650.png?size=256")
+        embeds[idx//4].insert_field_at(index=idx % 4, name="Item {}: {}".format(idx+1, filename), value=mediaUrl, inline=False)
+
+    menu = menus.MenuPages(MultiPageEmbed(embeds, per_page=1))
+    await menu.start(author)
+
+
+
 
 bot.run(TOKEN)
