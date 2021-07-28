@@ -86,13 +86,13 @@ async def _clear(ctx: SlashContext):
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False),
         create_option(
-            name="multipage embed?",
+            name="multipage_embed",
             description="Whether I should send the files in the form of a multipage embed",
             option_type=SlashCommandOptionType.BOOLEAN,
             required=False)],
     guild_ids=guild_ids
 )
-async def _all(ctx: SlashContext, dm: bool = False, multipageEmbed: bool = False):
+async def _all(ctx: SlashContext, dm: bool = False, multipage_embed: bool = False):
     """
     Responds to `/all`. Tries to display all docs from the Search Client.
 
@@ -116,13 +116,13 @@ async def _all(ctx: SlashContext, dm: bool = False, multipageEmbed: bool = False
         await ctx.send("Found no messages", hidden=True)
         return
     if dm:
-        if multipageEmbed:
-            await send_files_as_multipage_embed(ctx.author, files)
+        if multipage_embed:
+            await send_files_as_multipage_embed(ctx.author, files, mg_client)
         else:
             await send_files_as_message(ctx.author, files)
     else:
-        if multipageEmbed:
-            await send_files_as_multipage_embed(ctx, files)
+        if multipage_embed:
+            await send_files_as_multipage_embed(ctx, files, mg_client)
         else:
             await send_files_as_message(ctx, files)
 
