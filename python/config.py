@@ -18,12 +18,16 @@ ALGOLIA_SEARCH_KEY
 ALGOLIA_ADMIN_KEY
 """
 
+
 class Config(SimpleNamespace):
+    """Basic Config Manager."""
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def __contains__(self, key):
         return key in self.__dict__
+
 
 CONFIG = Config(**dotenv_values(find_dotenv()))
 

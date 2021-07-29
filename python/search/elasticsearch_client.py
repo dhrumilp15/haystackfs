@@ -1,26 +1,20 @@
 """The ElasticSearch Client."""
-import logging
 import json
+from .async_search_client import AsyncSearchClient
 import discord
 import elasticsearch
 from elasticsearch import AsyncElasticsearch
 from elasticsearch.exceptions import ConflictError, ConnectionError
 from typing import List, Dict
 from datetime import datetime
-from utils import attachment_to_es_dict
+from utils import attachment_to_search_dict
 
 from config import CONFIG
 
 CONN_ERR = "Could not connect to ElasticSearch. Please report this issue to dhrumilp15#4369 or on the discord server"
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format='%(asctime)s: %(levelname)s:%(message)s',
-    filename='es_client.log',
-    level=logging.DEBUG)
 
-
-class ElasticSearchClient():
+class ElasticSearchClient(AsyncSearchClient):
     """The ElasticSearch Client."""
 
     def __init__(self, domain=None, port=None):
@@ -31,12 +25,6 @@ class ElasticSearchClient():
             self.ES = self.connect(
                 CONFIG.ELASTIC_DOMAIN,
                 CONFIG.ELASTIC_PORT)
-        # self.last_snapshot = None
-        # snapshot_body = {
-        #     "type": "url", "settings": {
-        # "url": "http://download.elasticsearch.org/definitiveguide/sigterms_demo/"}}
-        # self.ES.snapshot.create_repository(
-        #     repository='MAIN', body=snapshot_body)
 
     def connect(self, domain: str, port: str) -> AsyncElasticsearch:
         """Connect to the ElasticSearch API."""
@@ -44,6 +32,10 @@ class ElasticSearchClient():
             return AsyncElasticsearch(domain + ':' + port)
         except ConnectionError:
             return CONN_ERR
+
+    def initialize(self, *args, **kwargs):
+        """Initialize client."""
+        pass
 
     async def clear_index(self, index: str):
         """
@@ -84,11 +76,10 @@ class ElasticSearchClient():
             index: The index to upload to
         """
         for file in message.attachments:
-            body = attachment_to_es_dict(message, file)
+            body = attachment_to_search_dict(message, file)
             try:
                 res = await self.ES.create(index=str(index), id=str(file.id), body=body)
             except (ConflictError, ConnectionError) as err:
-                logger.error(err)
                 continue
 
     async def make_snapshot(self):

@@ -1,11 +1,17 @@
 """A Search Client for Algolia."""
-import asyncio
 from algoliasearch.search_client import SearchClient
 from algoliasearch.exceptions import RequestException
-from discord.guild import BanEntry
 from config import CONFIG
-from search_client import AsyncSearchClient
+from .async_search_client import AsyncSearchClient
 from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='algolia_client.log', encoding='utf-8', mode='w')
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class AlgoliaClient(AsyncSearchClient):
@@ -13,14 +19,20 @@ class AlgoliaClient(AsyncSearchClient):
 
     def __init__(self, app_id=None, search_key=None, admin_key=None):
         """Init Search and Admin clients."""
-        self.search_client = SearchClient.create(
-            CONFIG.ALGOLIA_APP_ID, CONFIG.ALGOLIA_SEARCH_KEY)
-        self.admin_client = SearchClient.create(
-            CONFIG.ALGOLIA_APP_ID, CONFIG.ALGOLIA_ADMIN_KEY)
+        self.search_client = None
+        self.admin_client = None
+        if app_id and search_key and admin_key:
+            self.search_client = SearchClient.create(app_id, search_key)
+            self.admin_client = SearchClient.create(app_id, admin_key)
+
+    def initialize(self, *args, **kwargs):
+        """Initialize client."""
+        pass
 
     def show_indices(self):
         """Print all indices."""
-        print(self.admin_client.list_indices())
+        if self.admin_client:
+            print(self.admin_client.list_indices())
 
     def create_filter(self, **kwargs) -> str:
         """Construct a search filter."""
@@ -43,7 +55,7 @@ class AlgoliaClient(AsyncSearchClient):
             search_filter.append(f"ObjectID < {kwargs['before']}")
         return ' AND '.join(search_filter)
 
-    async def search(self, filename: str, serv_id: int, **kwargs) -> List[Dict]:
+    async def search(self, filename: str, serv_id: int, *args, **kwargs) -> List[Dict]:
         """
         Search for files.
 
@@ -54,6 +66,9 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Search results.
         """
+        if not self.search_client:
+            logger.info("self.search_client not initialized, returning []")
+            return []
         async with self.search_client as client:
             index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             filters = self.create_filter(**kwargs)
@@ -80,6 +95,8 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Whether the operation was executed.
         """
+        if not self.admin_client:
+            return False
         async with self.admin_client as client:
             index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             res = await index.save_object_async(meta_dict, {
@@ -100,6 +117,8 @@ class AlgoliaClient(AsyncSearchClient):
         Returns:
             Whether the remove operation succeeded.
         """
+        if not self.admin_client:
+            return False
         async with self.admin_client as client:
             index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             res = await index.delete_objects_async(ids, {
@@ -109,6 +128,8 @@ class AlgoliaClient(AsyncSearchClient):
 
     async def get_all_docs(self, serv_id: int) -> List[Dict]:
         """Retrieve all docs in an index."""
+        if not self.search_client:
+            return []
         async with self.search_client as client:
             index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             res = await index.search_async('')
@@ -116,6 +137,8 @@ class AlgoliaClient(AsyncSearchClient):
 
     async def clear(self, serv_id: int):
         """Clear an index."""
+        if not self.admin_client:
+            return False
         async with self.admin_client as client:
             index = client.init_index(CONFIG.DB_NAME + '_' + str(serv_id))
             res = await index.clear_objects_async()

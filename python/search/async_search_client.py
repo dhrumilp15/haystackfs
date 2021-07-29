@@ -6,6 +6,11 @@ class AsyncSearchClient(ABC):
     """Basic Requirements for any Search Client in this project."""
 
     @abstractmethod
+    def initialize(self, *args, **kwargs):
+        """Initialize clients."""
+        pass
+
+    @abstractmethod
     async def create_doc(self, *args, **kwargs):
         """Create a doc in the Search Index."""
         pass

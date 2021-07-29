@@ -1,14 +1,16 @@
 """Commonly used utility functions."""
 from typing import List, Dict
 from io import BytesIO
-from discord.ext.commands.core import command
 import requests
 import discord
 from discord.ext.commands import Bot
 from datetime import datetime
 import mongo_client as MgClient  # cyclic dependency
+from discord_slash import SlashContext
+from discord_slash.model import SlashCommandOptionType
+from discord_slash.utils.manage_commands import create_option, create_choice
 
-CONTENT_TYPE_CHOICES = [
+CONTENT_TYPE_CHOICES = sorted([
     {"name": "mp4", "value": "video/mp4"},
     {"name": "gif", "value": "image/gif"},
     {"name": "jpg/jpeg", "value": "image/jpeg"},
@@ -18,7 +20,68 @@ CONTENT_TYPE_CHOICES = [
     {"name": "audio", "value": "audio"},
     {"name": "zip", "value": "application/zip"},
     {"name": "mp3/m4a", "value": "audio/mpeg"},
-    {"name": "OTHER", "value": "OTHER"}
+
+], key=lambda x: x['name']) + [{"name": "OTHER", "value": "OTHER"}]
+
+search_options = [
+    create_option(
+        name="filename",
+        description="Even a partial name of your file will do :)",
+        option_type=SlashCommandOptionType.STRING,
+        required=True,
+    ),
+    create_option(
+        name="filetype",
+        description="You can choose a filetype here. Use `custom filetype` to specify a different one",
+        option_type=SlashCommandOptionType.STRING,
+        required=False,
+        choices=CONTENT_TYPE_CHOICES
+    ),
+    create_option(
+        name="custom_filetype",
+        description="Searches for files of a custom file type",
+        option_type=SlashCommandOptionType.STRING,
+        required=False,
+    ),
+    create_option(
+        name="author",
+        description="Searches for files uploaded by a user",
+        option_type=SlashCommandOptionType.USER,
+        required=False
+    ),
+    create_option(
+        name="channel",
+        description="Searches for files in a channel",
+        option_type=SlashCommandOptionType.CHANNEL,
+        required=False
+    ),
+    create_option(
+        name="content",
+        description="Search for files in messages by message content",
+        option_type=SlashCommandOptionType.STRING,
+        required=False
+    ),
+    create_option(
+        name="after",
+        description="Search for files after a date. \
+                Use the `before` option to specify a range of dates",
+        option_type=SlashCommandOptionType.STRING,
+        required=False
+    ),
+    create_option(
+        name="before",
+        description="Search for files before a date. \
+                Use the `after` option to specify a range of dates",
+        option_type=SlashCommandOptionType.STRING,
+        required=False
+    ),
+    create_option(
+        name="dm",
+        description="If `True`, I'll dm you what I find. \
+                Otherwise, I'll send it to this channel",
+        option_type=SlashCommandOptionType.BOOLEAN,
+        required=False,
+    ),
 ]
 
 PLZ_VERIFY = "Please verify this server at: https://forms.gle/UrhqHZNQhJHSdYpW7"
@@ -194,3 +257,16 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
         "width": file.width if file.width else -1,
         "timestamp": datetime.now()}
     return file_info
+
+
+async def send_files_as_message(author: discord.User or SlashContext, files: List[Dict], mg_client: MgClient):
+    """
+    Send files to the author of the message.
+
+    Args:
+        author: The author or SlashContext of the search query
+        files: A list of dicts of files returned from ElasticSearch
+    """
+    async for file in download(files, mg_client):
+        await author.send(file=file)
+        file.close()
