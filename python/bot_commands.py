@@ -103,7 +103,7 @@ async def fdelete(ctx: SlashContext or commands.Context, filename: str, search_c
             message = await onii_chan.fetch_message(file['message_id'])
             await message.delete()
             deleted_files.append(file['file_name'])
-        except discord.Forbidden:
+        except (discord.Forbidden, discord.errors.NotFound):
             continue
     return deleted_files
 
