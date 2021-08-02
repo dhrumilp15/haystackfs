@@ -1,24 +1,22 @@
 """The core functionality of the bot."""
 from search.async_search_client import AsyncSearchClient
 from mongo_client import MgClient
-# from elasticsearch_client import ElasticSearchClient
+from utils import filter_messages_with_permissions
 
 import discord
 from discord.ext import commands
 from discord_slash import SlashContext
 from typing import List, Dict
 
-from utils import filter_messages_with_permissions, attachment_to_search_dict
-from fuzzywuzzy import fuzz
-
 
 async def fremove(ctx: SlashContext or commands.Context,
                   filename: str,
                   search_client: AsyncSearchClient,
                   mg_client: MgClient,
-                  bot: commands.Bot) -> List[str]:
+                  bot: commands.Bot,
+                  **kwargs) -> List[str]:
     """
-    Remove files from ElasticSearch and MongoDB.
+    Remove files from search and database.
 
     Args:
         ctx: The message's origin
@@ -37,7 +35,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     if ctx.guild is not None:
         serv_id = ctx.guild.id
 
-    files = await search_client.search(filename, serv_id, ctx.channel)
+    files = await search_client.search(filename, serv_id, ctx.channel, **kwargs)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -161,10 +159,11 @@ async def fsearch(ctx: SlashContext or commands.Context,
     onii_chan = ctx.channel
     if ctx.guild is not None:
         onii_chan = ctx.guild
+
     files = await search_client.search(
-        filename=filename,
-        serv=onii_chan,
-        ctx_channel=ctx.channel,
+        filename,
+        onii_chan,
+        ctx.channel,
         **kwargs
     )
     if not files:

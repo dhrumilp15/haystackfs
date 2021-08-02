@@ -6,9 +6,8 @@ import discord
 from discord.ext.commands import Bot
 from datetime import datetime
 import mongo_client as MgClient  # cyclic dependency
-from discord_slash import SlashContext
 from discord_slash.model import SlashCommandOptionType
-from discord_slash.utils.manage_commands import create_option, create_choice
+from discord_slash.utils.manage_commands import create_option
 
 CONTENT_TYPE_CHOICES = sorted([
     {"name": "mp4", "value": "video/mp4"},
@@ -259,14 +258,14 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
     return file_info
 
 
-async def send_files_as_message(author: discord.User or SlashContext, files: List[Dict], mg_client: MgClient):
-    """
-    Send files to the author of the message.
+# async def send_files_as_message(author: discord.User or SlashContext, files: List[Dict], mg_client: MgClient):
+#     """
+#     Send files to the author of the message.
 
-    Args:
-        author: The author or SlashContext of the search query
-        files: A list of dicts of files returned from ElasticSearch
-    """
-    async for file in download(files, mg_client):
-        await author.send(file=file)
-        file.close()
+#     Args:
+#         author: The author or SlashContext of the search query
+#         files: A list of dicts of files returned from ElasticSearch
+#     """
+#     async for file in download(files, mg_client):
+#         await author.send(file=file)
+#         file.close()

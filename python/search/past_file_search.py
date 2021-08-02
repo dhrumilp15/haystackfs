@@ -4,6 +4,7 @@ import discord
 from typing import List, Dict
 from fuzzywuzzy import fuzz
 from utils import attachment_to_search_dict
+import datetime
 
 
 class PastFileSearch(AsyncSearchClient):
@@ -59,6 +60,7 @@ class PastFileSearch(AsyncSearchClient):
         if kwargs.get("channel"):
             if message.channel != kwargs["channel"]:
                 return []
+        # print(message.author, self.user, message.attachments[0].filename)
 
         res = filter(lambda atch: fuzz.partial_ratio(atch.filename.lower(),
                      filename.lower()) > self.thresh, message.attachments)
@@ -83,9 +85,6 @@ class PastFileSearch(AsyncSearchClient):
         if self.user is None or not isinstance(filename, str):
             return ""
         files = []
-        # fcounter = 0s
-        # mcounter = 0
-        # start = time.time()
         onii_chan = ctx_channel
         if kwargs.get("channel"):
             onii_chan = kwargs['channel']
@@ -94,17 +93,12 @@ class PastFileSearch(AsyncSearchClient):
         else:
             kwargs['banned_ids'] = self.banned_file_ids
 
-        matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get("before"), after=kwargs.get("after"))
-        # avg_attachment_time = 0
-        # avg_match_time = 0
-        # avg_join_time = 0
+        if kwargs.get('after') is None:
+            after = datetime.datetime.now() - datetime.timedelta(weeks=2)
+
+        matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get("before"), after=after)
         async for message in matched_messages:
-            # fcounter += len(message.attachments)
-            # st = time.time()
             matched = self.match(message, filename, **kwargs)
-            # avg_match_time += (time.time() - st) / 1000
-            # print(f"{avg_match_time}s for {len(message.attachments)} files")
-            # s = time.time()
             files.extend([{**attachment_to_search_dict(message, atch), 'url': atch.url,
                          'jump_url': message.jump_url} for atch in matched])
         return files
