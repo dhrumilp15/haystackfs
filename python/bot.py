@@ -23,27 +23,28 @@ slash = SlashCommand(bot, sync_commands=True)
 bot.load_extension('cog')
 
 
-# @slash.slash(
-#     name="reload",
-#     description="Reloads the cog file. Use this to deploy changes to the bot",
-#     guild_ids=[int(getattr(CONFIG, "GUILD_ID", 0))]
-# )
-# async def reload(ctx):
-#     """Reload cog if the bot owner requests a reload."""
-#     appinfo = await bot.application_info()
-#     if ctx.author == appinfo.owner:
-#         print(f"Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
-#         # Reloads the file, updating the Cog class.
-#         bot.reload_extension("cog")
+@slash.slash(
+    name="reload",
+    description="Reloads the cog file. Use this to deploy changes to the bot",
+    guild_ids=[int(getattr(CONFIG, "GUILD_ID", 0))]
+)
+async def reload(ctx):
+    """Reload cog if the bot owner requests a reload."""
+    appinfo = await bot.application_info()
+    if ctx.author == appinfo.owner:
+        print(f"Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
+        await ctx.send('Reloading!')
+        # Reloads the file, updating the Cog class.
+        bot.reload_extension("cog")
 
 
-# @bot.command()
-# async def reload(ctx):
-#     """Reload the bot."""
-#     appinfo = await bot.application_info()
-#     if ctx.author == appinfo.owner:
-#         print(f"Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
-#         # Reloads the file, updating the Cog class.
-#         bot.reload_extension("cog")
+@bot.command()
+async def reload(ctx):
+    """Reload the bot."""
+    appinfo = await bot.application_info()
+    if ctx.author == appinfo.owner:
+        print(f"Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
+        # Reloads the file, updating the Cog class.
+        bot.reload_extension("cog")
 
 bot.run(TOKEN)
