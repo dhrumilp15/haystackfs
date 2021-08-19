@@ -49,11 +49,13 @@ class Discordfs(commands.Cog):
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
         print(f'Guild ids: {self.guild_ids}')
-        self.initialize_clients(self.bot.user)
+        ok = self.initialize_clients(self.bot.user)
+        if ok:
+            print("Clients Initialized!")
 
-    def initialize_clients(self, *args, **kwargs):
+    def initialize_clients(self, *args, **kwargs) -> bool:
         """Initialize search and db clients."""
-        self.search_client.initialize(*args, **kwargs)
+        return self.search_client.initialize(*args, **kwargs)
 
     @cog_ext.cog_slash(
         name="search",
