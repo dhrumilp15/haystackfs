@@ -4,8 +4,8 @@ from search.past_file_search import PastFileSearch
 from search.searcher import Searcher
 from search.algolia_client import AlgoliaClient
 from mongo_client import MgClient
-from utils import attachment_to_search_dict, search_options, download
-from bot_commands import fall, fdelete, fremove, fsearch, fclear
+from utils import attachment_to_search_dict, search_options
+from bot_commands import fdelete, fremove, fsearch
 from config import CONFIG
 import logging
 from discord_slash import SlashContext, cog_ext
@@ -16,8 +16,6 @@ from dateutil import parser
 import glob
 from typing import List, Dict
 from MultiPageEmbed import MultiPageEmbed
-import traceback
-import sys
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -56,55 +54,6 @@ class Discordfs(commands.Cog):
     def initialize_clients(self, *args, **kwargs):
         """Initialize search and db clients."""
         self.search_client.initialize(*args, **kwargs)
-
-    @cog_ext.cog_slash(
-        name="clear",
-        description="Clears all docs. Use this power carefully.",
-        guild_ids=guild_ids
-    )
-    async def _clear(self, ctx: SlashContext):
-        await ctx.defer()
-        serv = ctx.channel
-        if ctx.guild:
-            serv = ctx.guild
-        if serv.id not in guild_ids:
-            ctx.send("Clear is too dangerous to be used...")
-            return
-        await fclear(self.search_client, self.db_client, serv.id)
-        await ctx.send(content="Index cleared", hidden=True)
-
-    @cog_ext.cog_slash(
-        name="all",
-        description="Show all files",
-        options=search_options,
-        guild_ids=guild_ids
-    )
-    async def _all(self, ctx: SlashContext, **kwargs):
-        """
-        Responds to `/all`. Tries to display all docs from the Search Client.
-
-        Args:
-            ctx: The SlashContext from which the command originated
-            DM: A bool for whether to dm the author the results.
-        """
-        await ctx.defer()
-        serv = ctx.channel
-        if ctx.guild:
-            serv = ctx.guild
-        if serv.id not in guild_ids:
-            ctx.send("All is too spammy to be used...")
-            return
-        files = await fall(ctx, self.search_client, self.bot, **kwargs)
-        if isinstance(files, str):
-            await ctx.send(files, hidden=True)
-            return
-        if not files:
-            await ctx.send("Found no messages", hidden=True)
-            return
-        author = ctx
-        if kwargs.get("dm"):
-            author = ctx.author
-        await self.send_files_as_message(author, files, self.db_client)
 
     @cog_ext.cog_slash(
         name="search",
@@ -205,41 +154,6 @@ class Discordfs(commands.Cog):
         if isinstance(files, str):
             await ctx.author.send(content=files)
             return
-        await self.send_files_as_message(ctx, files, self.db_client)
-
-    @commands.command(name="clear", aliases=["c"], pass_context=True)
-    async def clear(self, ctx: commands.Context):
-        """Clear the index associated with the current id."""
-        serv = ctx.channel
-        if ctx.guild:
-            serv = ctx.guild
-        if serv.id not in guild_ids:
-            ctx.send("Clear is too dangerous to be used...")
-            return
-        if ctx.message.guild is not None:
-            await fclear(self.search_client, self.db_client, ctx.message.guild.id)
-        else:
-            await fclear(self.search_client, self.db_client, ctx.message.channel.id)
-
-    @commands.command(name="all", aliases=["a"], pass_context=True)
-    async def all_docs(self, ctx: commands.Context):
-        """
-        Display all docs from ElasticSearch.
-
-        Args:
-            ctx: The commands.Context from which the command originated
-        """
-        serv = ctx.channel
-        if ctx.guild:
-            serv = ctx.guild
-        if serv.id not in guild_ids:
-            ctx.send("All is too spammy to be used...")
-            return
-        files = await fall(ctx, self.search_client, self.bot)
-        if isinstance(files, str):
-            await ctx.send(files)
-            return
-        await ctx.send("I found these:")
         await self.send_files_as_message(ctx, files, self.db_client)
 
     @commands.command(name="delete", aliases=["del"], pass_context=True)

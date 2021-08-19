@@ -106,36 +106,6 @@ async def fdelete(ctx: SlashContext or commands.Context, filename: str, search_c
     return deleted_files
 
 
-async def fall(ctx: SlashContext or commands.Context, search_client: AsyncSearchClient, bot: commands.Bot,
-               **kwargs) -> List[Dict]:
-    """
-    Find all docs in ElasticSearch.
-
-    Args:
-        ctx: The message's origin
-        search_client: The Search client
-        bot: The discord bot
-
-    Returns:
-        A list of dicts of viewable files.
-    """
-    serv_id = ctx.channel.id
-    if ctx.guild is not None:
-        serv_id = ctx.guild.id
-    files = await search_client.get_all_docs(serv_id)
-    if not files:
-        return "The archives are empty... Perhaps you could contribute..."
-    manageable_files = filter_messages_with_permissions(
-        ctx.author,
-        files,
-        discord.Permissions(read_message_history=True),
-        bot
-    )
-    if not manageable_files:
-        return "I couldn't find any files that you can access"
-    return manageable_files
-
-
 async def fsearch(ctx: SlashContext or commands.Context,
                   filename: str,
                   search_client: AsyncSearchClient,
@@ -178,16 +148,3 @@ async def fsearch(ctx: SlashContext or commands.Context,
     if not manageable_files:
         return f"I couldn't find any files that you can access"
     return manageable_files
-
-
-async def fclear(search_client: AsyncSearchClient, mg_client: MgClient, index: str):
-    """
-    Clear a channel or server id.
-
-    Args:
-        search_client: The Search client
-        mg_client: The MongoDB client
-        index: The index to clear
-    """
-    await search_client.clear(index)
-    await mg_client.mass_remove_file(index)

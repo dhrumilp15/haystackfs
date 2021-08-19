@@ -107,6 +107,10 @@ class PastFileSearch(AsyncSearchClient):
         """We don't maintain search indices in this class, so this is not needed."""
         return
 
+    async def clear(self, *args, **kwargs):
+        """We don't maintain search indices in this class, so this is not needed."""
+        return
+
     async def remove_doc(self, file_ids: list, *args, **kwargs):
         """Update banned ids with the file ids."""
         self.banned_file_ids.add(tuple(file_ids))
