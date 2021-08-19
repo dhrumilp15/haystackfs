@@ -23,7 +23,7 @@ class PastFileSearch(AsyncSearchClient):
         self.thresh = thresh
         self.user = None
 
-    def initialize(self, bot_user: str, *args, **kwargs):
+    def initialize(self, bot_user: str, *args, **kwargs) -> bool:
         """
         Initialize past file search.
 
@@ -31,6 +31,7 @@ class PastFileSearch(AsyncSearchClient):
             bot_user: The bot username.
         """
         self.user = bot_user
+        return True
 
     def match(self, message: discord.Message, filename: str, **kwargs) -> List[discord.Attachment]:
         """
@@ -86,17 +87,14 @@ class PastFileSearch(AsyncSearchClient):
             return ""
         files = []
         onii_chan = ctx_channel
-        if kwargs.get("channel"):
+        if kwargs.get('channel'):
             onii_chan = kwargs['channel']
-        if kwargs.get("banned_ids"):
+        if kwargs.get('banned_ids'):
             kwargs['banned_ids'].update(self.banned_file_ids)
         else:
             kwargs['banned_ids'] = self.banned_file_ids
 
-        if kwargs.get('after') is None:
-            after = datetime.datetime.now() - datetime.timedelta(weeks=2)
-
-        matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get("before"), after=after)
+        matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get('before'), after=kwargs.get('after'))
         async for message in matched_messages:
             matched = self.match(message, filename, **kwargs)
             files.extend([{**attachment_to_search_dict(message, atch), 'url': atch.url,

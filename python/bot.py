@@ -18,7 +18,7 @@ TOKEN = CONFIG.DISCORD_TOKEN
 if getattr(CONFIG, 'DB_NAME', None) == "testing":
     TOKEN = getattr(CONFIG, 'TEST_DISCORD_TOKEN', CONFIG.DISCORD_TOKEN)
 bot = commands.Bot(command_prefix='fs!', intents=discord.Intents.all())
-slash = SlashCommand(bot)
+slash = SlashCommand(bot, sync_commands=True)
 
 bot.load_extension('cog')
 
