@@ -80,7 +80,7 @@ class AlgoliaClient(AsyncSearchClient):
                 try:
                     return (await res)['hits']
                 except BaseException as e:
-                    return res["hits"]
+                    return (await res)["hits"]
             except RequestException as err:
                 return []
 
