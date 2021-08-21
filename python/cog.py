@@ -9,6 +9,9 @@ from bot_commands import fdelete, fremove, fsearch
 from config import CONFIG
 import logging
 from discord_slash import SlashContext, cog_ext
+from discord_slash.utils.manage_components import create_select, create_select_option, create_actionrow, create_button
+from discord_slash.model import ButtonStyle
+from discord_slash.context import ComponentContext
 from discord.ext import commands, tasks, menus
 import discord
 import datetime
@@ -289,52 +292,63 @@ class Discordfs(commands.Cog):
             await self.db_client.load_from_snapshot(snaps)
             logger.debug("Database restored!")
 
+    @commands.Cog.listener()
+    async def on_component(self, ctx: ComponentContext):
+        """
+        Update origin component.
+
+        Edits the embed of the existing message.
+        """
+        embed = ctx.origin_message.embeds[0]
+        name = ""
+        jump_url = ctx.selected_options[0]
+        for opt in ctx.component['options']:
+            if opt['value'] == jump_url:
+                name = opt['label']
+                break
+        embed.set_field_at(index=0, name=name, value=jump_url)
+        await ctx.edit_origin(embed=embed)
+
     async def cog_command_error(ctx, error):
         """Command error."""
         print(error)
 
-    # async def send_files_as_message(self, author: SlashContext, files: List[Dict], mg_client: MgClient):
-    #     """Send files as a message."""
-    #     print("Sending files as a message!")
-    #     await author.send(f"Found {' '.join([f['file_name'] for f in files])}")
-    #     try:
-    #         chan = author.channel
-    #     except:
-    #         chan = await author.create_dm()
-    #     async for file in download(files, mg_client):
-    #         await chan.send(file=file)
-    #         file.close()
-
-    async def send_files_as_message(self, author: SlashContext, files: List[Dict], mg_client: MgClient):
+    async def send_files_as_message(self, ctx: SlashContext, files: List[Dict], mg_client: MgClient):
         """
-        Send files to the author of the message in the form of a multipage embed.
+        Send files as a message to ctx.
 
         Args:
-            author: The author or SlashContext of the search query
-            fileData: A list of dicts of files returned from the search client
+            ctx: The originating context.
+            files: The files to send to the context.
+            mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
-        await author.send(f"Found {' '.join([f['file_name'] for f in files])}")
-        embeds = []
-        for idx in range(0, len(files), 4):
-            embed = discord.Embed(
-                title=f"Page {idx // 4 + 1} of {len(files) // 4 + 1}",
-                color=discord.Colour.teal(),
+        if len(files) <= 5:
+            buttons = [create_button(style=ButtonStyle.URL, label=f['file_name'], url=f['jump_url']) for f in files]
+            action_row = create_actionrow(*buttons)
+        else:
+            select = create_select(
+                options=[create_select_option(file['file_name'], value=file['jump_url']) for file in files],
+                placeholder="Choose your files here!",
+                min_values=1,
+                max_values=1,
             )
-            embed.set_footer(
-                text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
-                icon_url=self.bot.user.avatar_url
-            )
-            for i, file in enumerate(files[idx:idx + 4]):
-                filename = file.get('file_name')
-                mediaUrl = file.get('jump_url')
-                if not mediaUrl:
-                    file_id = file['objectID']
-                    res = await mg_client.get_file(file_id)
-                    mediaUrl = res['url']
-                embed.insert_field_at(index=i, name=filename, value=mediaUrl, inline=False)
-            embeds.append(embed)
-        menu = menus.MenuPages(MultiPageEmbed(embeds, per_page=1))
-        await menu.start(author)
+            action_row = create_actionrow(select)
+        embed = discord.Embed(
+            title=f"Found {len(files)} files",
+            color=discord.Colour.teal(),
+        )
+        embed.set_footer(
+            text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
+            icon_url=self.bot.user.avatar_url
+        )
+        filename = files[0].get('file_name')
+        mediaUrl = files[0].get('jump_url')
+        if not mediaUrl:
+            file_id = files[0]['objectID']
+            res = await mg_client.get_file(file_id)
+            mediaUrl = res['url']
+        embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
+        await ctx.send(f"Found {len(files)} files", embed=embed, components=[action_row])
 
 
 def setup(bot):
