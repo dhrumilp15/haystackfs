@@ -15,7 +15,7 @@ from bson import json_util
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-fh = logging.FileHandler('monogodb.log', encoding='utf-8', mode='w')
+fh = logging.FileHandler('mongodb.log', encoding='utf-8', mode='w')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
@@ -23,11 +23,13 @@ logger.addHandler(fh)
 class MgClient:
     """MongoDB Client."""
 
-    def __init__(self):
+    def __init__(self, mongo_endpoint: str = None, db_name: str = None):
         """Initialize the MongoDB Client and database."""
-        self.client = AsyncIOMotorClient(CONFIG.MONGO_ENDPOINT)
-        self.db = self.client[CONFIG.DB_NAME]
-        logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
+        self.client, self.db = None, None
+        if mongo_endpoint and db_name:
+            self.client = AsyncIOMotorClient(mongo_endpoint)
+            self.db = self.client[db_name]
+            logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
 
     async def get_file(self, file_id: int) -> dict:
         """
@@ -39,10 +41,12 @@ class MgClient:
         Returns:
             The file url as a str.
         """
+        if not self.db:
+            return {}
         res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "file_name": 1})
         return res
 
-    async def add_server(self, server: discord.Guild or discord.DMChannel):
+    async def add_server(self, server: discord.Guild or discord.DMChannel) -> bool:
         """
         Add a server or channel to the `servers` collection.
 
@@ -52,6 +56,8 @@ class MgClient:
         Returns:
             Whether the insert operation was successful
         """
+        if not self.db:
+            return False
         server_coll = self.db.servers
         # We've already added the server
         num_docs = await server_coll.count_documents({"_id": server.id}, limit=1)
@@ -75,6 +81,8 @@ class MgClient:
         Returns:
             Whether the remove operation was successful.
         """
+        if not self.db:
+            return False
         server_coll = self.db.servers
         res = await server_coll.update_one({"_id": server_id}, {'$set': {"bot_in_server": False}})
         if res.acknowledged:
@@ -93,6 +101,8 @@ class MgClient:
         Returns:
             Whether the remove operation was successful.
         """
+        if not self.db:
+            return False
         files_coll = self.db.files
         res = await files_coll.delete_many({"guild_id": server_id})
         return res.acknowledged
@@ -107,6 +117,8 @@ class MgClient:
         Returns:
             The number of files in the message successfully inserted into the collection
         """
+        if not self.db:
+            return 0
         files_coll = self.db.files
         files_added = 0
         # We've already added the files in this message id
@@ -128,7 +140,7 @@ class MgClient:
                 logger.error(f"Failed to insert file with _id: {file.id}")
         return files_added
 
-    async def remove_file(self, file_ids: List[str]):
+    async def remove_file(self, file_ids: List[str]) -> bool:
         """
         Remove files.
 
@@ -138,6 +150,8 @@ class MgClient:
         Returns:
             Whether the file was succesfully removed.
         """
+        if not self.db:
+            return False
         files_coll = self.db.files
         res = await files_coll.delete_many({"_id": {"$in": file_ids}})
         return res.acknowledged
@@ -149,6 +163,8 @@ class MgClient:
         Args:
             collection: A collection from mongodb.
         """
+        if not self.db:
+            return
         path = f"{CONFIG.DB_NAME}_{collection.name}"
         if not os.path.exists(path):
             os.mkdir(path)
@@ -167,6 +183,8 @@ class MgClient:
         Returns:
             Whether the operation was completed successfully.
         """
+        if not self.db:
+            return False
         ack = False
         with open(snapshot_path, 'r') as f:
             docs = json.load(f, object_hook=json_util.object_hook)
@@ -174,7 +192,7 @@ class MgClient:
             ack = res.acknowledged
         return ack
 
-    async def mass_remove_file(self, serv_id: str):
+    async def mass_remove_file(self, serv_id: str) -> bool:
         """
         Remove a file.
 
@@ -184,6 +202,8 @@ class MgClient:
         Returns:
             Whether the delete operation was succesfully performed and at least 1 file was deleted.
         """
+        if not self.db:
+            return False
         files_coll = self.db.files
         res = await files_coll.delete_many({"guild_id": serv_id})
         if res.acknowledged:
@@ -192,8 +212,10 @@ class MgClient:
             logger.error(f"Failed to delete files with guild_id: {serv_id}")
         return res.acknowledged
 
-    async def verify(self, serv_id: int):
+    async def verify(self, serv_id: int) -> bool:
         """Verify a server."""
+        if not self.db:
+            return False
         res = await self.db.servers.find_one({"_id": serv_id}, {"verified": 1})
         return res["verified"]
 
@@ -204,6 +226,8 @@ class MgClient:
         Returns:
             Whether the delete operation was acknowledged.
         """
+        if not self.db:
+            return False
         server_coll = self.db.servers
         inactive_servers = server_coll.find({"bot_in_server": False})
         inactive_serv = [serv['_id'] async for serv in inactive_servers]
