@@ -12,13 +12,12 @@ from discord_slash import SlashContext, cog_ext
 from discord_slash.utils.manage_components import create_select, create_select_option, create_actionrow, create_button
 from discord_slash.model import ButtonStyle
 from discord_slash.context import ComponentContext
-from discord.ext import commands, tasks, menus
+from discord.ext import commands, tasks
 import discord
 import datetime
 from dateutil import parser
 import glob
 from typing import List, Dict
-from MultiPageEmbed import MultiPageEmbed
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -77,7 +76,7 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
         """
-        await ctx.defer()
+        await ctx.defer(hidden=dm)
         if filetype == "OTHER" and custom_filetype is None:
             await ctx.send(f"You specified a custom filetype but didn't provide one!")
             return
@@ -102,6 +101,7 @@ class Discordfs(commands.Cog):
         author = ctx
         if dm:
             author = ctx.author
+            await ctx.send('Attempting to dm your files...', hidden=True)
         await self.send_files_as_message(author, files, self.db_client)
 
     @cog_ext.cog_slash(
@@ -112,13 +112,13 @@ class Discordfs(commands.Cog):
     )
     async def _delete(self, ctx, filename, **kwargs):
         """
-        Responds to `/delete`. Tries to remove docs related to a query from ElasticSearch and their respective discord messages.
+        Responds to `/delete`. Tries to remove docs related to a query and their respective discord messages.
 
         Args:
             ctx: The SlashContext from which the command originated
             filename: A str of the filename to query for.
         """
-        await ctx.defer()
+        await ctx.defer(hidden=True)
         deleted_files = await fdelete(ctx, filename, self.search_client, self.db_client, self.bot, **kwargs)
         if isinstance(deleted_files, str):
             await ctx.send(content=deleted_files, hidden=True)
@@ -133,13 +133,13 @@ class Discordfs(commands.Cog):
     )
     async def _remove(self, ctx: SlashContext, filename: str, **kwargs):
         """
-        Responds to `/remove`. Tries to remove docs related to a query from ElasticSearch.
+        Responds to `/remove`. Tries to remove docs related to a query from applicable search indices.
 
         Args:
             ctx: The SlashContext from which the command originated
             filename: A str of the filename to query for.
         """
-        await ctx.defer()
+        await ctx.defer(hidden=True)
         removed_files = await fremove(ctx, filename, self.search_client, self.db_client, self.bot, **kwargs)
         if isinstance(removed_files, str):
             await ctx.send(content=removed_files, hidden=True)
@@ -149,7 +149,7 @@ class Discordfs(commands.Cog):
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
     async def search(self, ctx: commands.Context, filename: str):
         """
-        Display docs related to a query from ElasticSearch.
+        Find and send files related to a query.
 
         Args:
             ctx: The commands.Context from which the command originated
