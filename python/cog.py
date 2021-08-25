@@ -101,7 +101,7 @@ class Discordfs(commands.Cog):
         author = ctx
         if dm:
             author = ctx.author
-            await ctx.send('Attempting to dm your files...', hidden=True)
+            await ctx.send("DM'ing your files...", hidden=True)
         await self.send_files_as_message(author, files, self.db_client)
 
     @cog_ext.cog_slash(
@@ -322,6 +322,7 @@ class Discordfs(commands.Cog):
             files: The files to send to the context.
             mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
+        files = files[:25]
         if len(files) <= 5:
             buttons = [create_button(style=ButtonStyle.URL, label=f['file_name'], url=f['jump_url']) for f in files]
             action_row = create_actionrow(*buttons)
@@ -334,7 +335,7 @@ class Discordfs(commands.Cog):
             )
             action_row = create_actionrow(select)
         embed = discord.Embed(
-            title=f"Found {len(files)} files",
+            title=f"Found {len(files)} file{'s' if len(files) > 1 else ''}",
             color=discord.Colour.teal(),
         )
         embed.set_footer(
@@ -348,7 +349,7 @@ class Discordfs(commands.Cog):
             res = await mg_client.get_file(file_id)
             mediaUrl = res['url']
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
-        await ctx.send(f"Found {len(files)} files", embed=embed, components=[action_row])
+        await ctx.send(f"Found {files[0]['file_name']} {'and more...' if len(files) > 1 else ''}", embed=embed, components=[action_row])
 
 
 def setup(bot):
