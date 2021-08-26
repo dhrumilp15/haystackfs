@@ -299,15 +299,16 @@ class Discordfs(commands.Cog):
 
         Edits the embed of the existing message.
         """
-        embed = ctx.origin_message.embeds[0]
-        name = ""
-        jump_url = ctx.selected_options[0]
-        for opt in ctx.component['options']:
-            if opt['value'] == jump_url:
-                name = opt['label']
-                break
-        embed.set_field_at(index=0, name=name, value=jump_url)
-        await ctx.edit_origin(embed=embed)
+        if ctx.component_type == 3:
+            embed = ctx.origin_message.embeds[0]
+            name = ""
+            jump_url = ctx.selected_options[0]
+            for opt in ctx.component['options']:
+                if opt['value'] == jump_url:
+                    name = opt['label']
+                    break
+            embed.set_field_at(index=0, name=name, value=jump_url)
+            await ctx.edit_origin(embed=embed)
 
     async def cog_command_error(ctx, error):
         """Command error."""
