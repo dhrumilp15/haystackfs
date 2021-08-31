@@ -1,4 +1,5 @@
 """Cog class."""
+from functools import wraps
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
 from search.searcher import Searcher
@@ -59,12 +60,20 @@ class Discordfs(commands.Cog):
         """Initialize search and db clients."""
         return self.search_client.initialize(*args, **kwargs)
 
+    def log_command(function):
+        @wraps(function)
+        async def wrapper(self, *args, **kwargs):
+            await self.db_client.log_command(function, *args, **kwargs)
+            return await function(self, *args, **kwargs)
+        return wrapper
+
     @cog_ext.cog_slash(
         name="search",
         description="Search for files.",
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
+    @log_command
     async def _search(self, ctx: SlashContext, filename: str, filetype: str = None, custom_filetype: str = None,
                       author: discord.User = None, channel: discord.channel = None, content: str = None, after: str = None,
                       before: str = None, dm: bool = False):
@@ -77,6 +86,7 @@ class Discordfs(commands.Cog):
             DM: A bool for whether to dm the author the results.
         """
         await ctx.defer(hidden=dm)
+
         if filetype == "OTHER" and custom_filetype is None:
             await ctx.send(f"You specified a custom filetype but didn't provide one!")
             return
@@ -110,6 +120,7 @@ class Discordfs(commands.Cog):
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
+    @log_command
     async def _delete(self, ctx, filename, **kwargs):
         """
         Responds to `/delete`. Tries to remove docs related to a query and their respective discord messages.
@@ -131,6 +142,7 @@ class Discordfs(commands.Cog):
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
+    @log_command
     async def _remove(self, ctx: SlashContext, filename: str, **kwargs):
         """
         Responds to `/remove`. Tries to remove docs related to a query from applicable search indices.
@@ -147,6 +159,7 @@ class Discordfs(commands.Cog):
         await ctx.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
 
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
+    @log_command
     async def search(self, ctx: commands.Context, filename: str):
         """
         Find and send files related to a query.
@@ -162,6 +175,7 @@ class Discordfs(commands.Cog):
         await self.send_files_as_message(ctx, files, self.db_client)
 
     @commands.command(name="delete", aliases=["del"], pass_context=True)
+    @log_command
     async def delete(self, ctx: commands.Context, filename: str):
         """
         Delete docs related to the given filename from ElasticSearch and their respective messages.
@@ -177,6 +191,7 @@ class Discordfs(commands.Cog):
         await ctx.author.send("Deleted: " + ' '.join(deleted_files))
 
     @commands.command(name="remove", aliases=["rm"], pass_context=True)
+    @log_command
     async def remove(self, ctx, filename):
         """
         Remove docs related to the given filename from ElasticSearch.

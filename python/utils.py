@@ -1,6 +1,7 @@
 """Commonly used utility functions."""
 from typing import List, Dict
 from io import BytesIO
+from discord_slash.context import SlashContext
 import requests
 import discord
 from discord.ext.commands import Bot
@@ -82,8 +83,6 @@ search_options = [
         required=False,
     ),
 ]
-
-PLZ_VERIFY = "Please verify this server at: https://forms.gle/UrhqHZNQhJHSdYpW7"
 
 
 def filter_messages_with_permissions(author: discord.User, files: List[Dict], perm: discord.Permissions, bot: Bot) -> List[Dict]:
@@ -171,7 +170,7 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
     Returns:
         A dict that contains metadata about the attachment.
     """
-    body = {
+    return {
         "objectID": file.id,
         "author_id": message.author.id,
         "content": message.content,
@@ -180,7 +179,6 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
         "message_id": message.id,
         "channel_id": message.channel.id,
     }
-    return body
 
 
 def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
@@ -201,7 +199,7 @@ def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
     Returns:
         A dict that contains metadata about the attachment.
     """
-    server_info = {
+    return {
         "_id": server.id,
         "created_at": server.created_at,
         "owner_id": server.owner_id,
@@ -218,7 +216,6 @@ def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
         "bot_in_server": True,
         "verified": False
     }
-    return server_info
 
 
 def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment) -> Dict:
@@ -239,7 +236,7 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
     Returns:
         A dict that contains metadata about the attachment.
     """
-    file_info = {
+    return {
         "_id": file.id,
         "author": message.author.id,
         "author_name": message.author.name + '#' + str(message.author.discriminator),
@@ -255,17 +252,25 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
         "height": file.height if file.height else -1,
         "width": file.width if file.width else -1,
         "timestamp": datetime.now()}
-    return file_info
 
 
-# async def send_files_as_message(author: discord.User or SlashContext, files: List[Dict], mg_client: MgClient):
-#     """
-#     Send files to the author of the message.
+def command_to_mongo_dict(command_type: str, ctx: SlashContext, query: dict) -> Dict:
+    """
+    Convert a command to a dict.
 
-#     Args:
-#         author: The author or SlashContext of the search query
-#         files: A list of dicts of files returned from ElasticSearch
-#     """
-#     async for file in download(files, mg_client):
-#         await author.send(file=file)
-#         file.close()
+    Args:
+        command: The command.
+
+    Returns:
+        A dict that summarizes the command.
+    """
+    source = ctx.channel.id
+    if ctx.guild is not None:
+        source = ctx.guild.id
+    return {
+        "caller": ctx.author.name + '#' + ctx.author.discriminator,
+        "query": query,
+        "source": source,
+        "type": command_type,
+        "timestamp": datetime.now(),
+    }
