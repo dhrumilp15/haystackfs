@@ -46,6 +46,24 @@ class MgClient:
         res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "file_name": 1})
         return res
 
+    async def log_command(self, command, *args, **kwargs) -> bool:
+        if not self.db:
+            return False
+        ctx = args[0]
+        command_type = 'search'
+        if 'delete' in command.__name__:
+            command_type = 'delete'
+        if 'remove' in command.__name__:
+            command_type = 'remove'
+        command_info = utils.command_to_mongo_dict(command_type, ctx, kwargs)
+        command_coll = self.db.commands
+        res = await command_coll.insert_one(command_info)
+        if res.acknowledged:
+            logger.info(f"Inserted new command: {res.inserted_id}")
+        else:
+            logger.error(f"Failed to insert new command {ctx.id}")
+        return res.acknowledged
+
     async def add_server(self, server: discord.Guild or discord.DMChannel) -> bool:
         """
         Add a server or channel to the `servers` collection.
