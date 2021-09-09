@@ -55,6 +55,8 @@ class MgClient:
             command_type = 'delete'
         if 'remove' in command.__name__:
             command_type = 'remove'
+        for key, val in kwargs.items():
+            kwargs[key] = repr(val)
         command_info = utils.command_to_mongo_dict(command_type, ctx, kwargs)
         command_coll = self.db.commands
         res = await command_coll.insert_one(command_info)
