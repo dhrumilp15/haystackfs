@@ -21,14 +21,14 @@ CONTENT_TYPE_CHOICES = sorted([
     {"name": "zip", "value": "application/zip"},
     {"name": "mp3/m4a", "value": "audio/mpeg"},
 
-], key=lambda x: x['name']) + [{"name": "OTHER", "value": "OTHER"}]
+], key=lambda x: x['name'])
 
 search_options = [
     create_option(
         name="filename",
         description="Even a partial name of your file will do :)",
         option_type=SlashCommandOptionType.STRING,
-        required=True,
+        required=False,
     ),
     create_option(
         name="filetype",
@@ -159,7 +159,7 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
     The dict metadata format only contains searchable fields:
     - author id
     - message content
-    - mimetype
+    - filetype
     - message_id
     - channel_id
 
@@ -175,7 +175,7 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
         "author_id": message.author.id,
         "content": message.content,
         "file_name": file.filename,
-        "mimetype": file.content_type,
+        "filetype": file.content_type,
         "message_id": message.id,
         "channel_id": message.channel.id,
     }
@@ -189,7 +189,7 @@ def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
     - author id
     - message content
     - created_at
-    - mimetype
+    - filetype
     - message_id
 
     Args:
@@ -226,7 +226,7 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
     - author id
     - message content
     - created_at
-    - mimetype
+    - filetype
     - message_id
 
     Args:

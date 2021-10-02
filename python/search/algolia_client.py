@@ -37,8 +37,8 @@ class AlgoliaClient(AsyncSearchClient):
     def create_filter(self, **kwargs) -> str:
         """Construct a search filter."""
         search_filter = []
-        if kwargs.get("mimetype"):
-            search_filter.append(f"mimetype = {kwargs['mimetype']}")
+        if kwargs.get("filetype"):
+            search_filter.append(f"filetype = {kwargs['filetype']}")
         if kwargs.get("author"):
             search_filter.append(f"author = {kwargs['author']}")
         if kwargs.get("channel"):

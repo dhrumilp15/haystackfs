@@ -117,7 +117,7 @@ class ElasticSearchClient(AsyncSearchClient):
         Args:
             filename: A str of the filename
             index: A str of the index
-            filetype: A str of the file's mimetype
+            filetype: A str of the file's filetype
             author: A discord.User of the author whose files to search for
 
         Returns:
@@ -143,11 +143,11 @@ class ElasticSearchClient(AsyncSearchClient):
                 }
             }
         }
-        if kwargs.get("mimetype"):
+        if kwargs.get("filetype"):
             query["query"]["bool"]["must"].append(
                 {
                     "match": {
-                        "mimetype": kwargs["mimetype"]
+                        "filetype": kwargs["filetype"]
                     }
                 }
             )
