@@ -74,7 +74,7 @@ class Discordfs(commands.Cog):
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def _search(self, ctx: SlashContext, filename: str, filetype: str = None, custom_filetype: str = None,
+    async def _search(self, ctx: SlashContext, filename: str = None, filetype: str = None, custom_filetype: str = None,
                       author: discord.User = None, channel: discord.channel = None, content: str = None, after: str = None,
                       before: str = None, dm: bool = False):
         """
@@ -87,12 +87,9 @@ class Discordfs(commands.Cog):
         """
         await ctx.defer(hidden=dm)
 
-        if filetype == "OTHER" and custom_filetype is None:
-            await ctx.send(f"You specified a custom filetype but didn't provide one!")
+        if not any([filename, filetype, custom_filetype, author, channel, content, after, before, dm]):
+            await ctx.send(f"You must specify a parameter to search on!", hidden=True)
             return
-
-        if filetype is not None and custom_filetype is not None:
-            filetype = custom_filetype
 
         if before is not None:
             before = parser.parse(before)
@@ -103,8 +100,11 @@ class Discordfs(commands.Cog):
             after = parser.parse(after)
             after = datetime.datetime(*after.timetuple()[:3])
             after -= datetime.timedelta(microseconds=1)
-        files = await fsearch(ctx=ctx, filename=filename, search_client=self.search_client, bot=self.bot, mimetype=filetype,
-                              author=author, content=content, channel=channel, after=after, before=before)
+        files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot,
+                              filename=filename, filetype=filetype, custom_filetype=custom_filetype,
+                              author=author, content=content, channel=channel, after=after,
+                              before=before)
+        # TODO: Better Error Handling
         if isinstance(files, str):
             await ctx.send(content=files, hidden=True)
             return
@@ -339,10 +339,12 @@ class Discordfs(commands.Cog):
             mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
         files = files[:25]
+        # TODO: Display all of the files in the embed if file count <= 5
         if len(files) <= 5:
             buttons = [create_button(style=ButtonStyle.URL, label=f['file_name'], url=f['jump_url']) for f in files]
             action_row = create_actionrow(*buttons)
         else:
+            # TODO: Sort the files in the select
             select = create_select(
                 options=[create_select_option(file['file_name'], value=file['jump_url']) for file in files],
                 placeholder="Choose your files here!",

@@ -6,6 +6,7 @@ import discord
 from discord_slash import SlashCommand
 from datetime import datetime
 
+# logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
@@ -13,7 +14,7 @@ formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
 dlogger.addHandler(handler)
 
-
+# bot init
 TOKEN = CONFIG.DISCORD_TOKEN
 if getattr(CONFIG, 'DB_NAME', None) == "testing":
     TOKEN = getattr(CONFIG, 'TEST_DISCORD_TOKEN', CONFIG.DISCORD_TOKEN)

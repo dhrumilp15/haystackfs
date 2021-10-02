@@ -33,7 +33,7 @@ class PastFileSearch(AsyncSearchClient):
         self.user = bot_user
         return True
 
-    def match(self, message: discord.Message, filename: str, **kwargs) -> List[discord.Attachment]:
+    def match(self, message: discord.Message, **kwargs) -> List[discord.Attachment]:
         """
         Match the message against possible arguments.
 
@@ -61,17 +61,22 @@ class PastFileSearch(AsyncSearchClient):
         if kwargs.get("channel"):
             if message.channel != kwargs["channel"]:
                 return []
-        # print(message.author, self.user, message.attachments[0].filename)
-
-        res = filter(lambda atch: fuzz.partial_ratio(atch.filename.lower(),
-                     filename.lower()) > self.thresh, message.attachments)
-        if kwargs.get("mimetype"):
-            return [attachment for attachment in res if attachment.content_type == kwargs["mimetype"]]
+        res = message.attachments
+        if kwargs.get('filename'):
+            filename = kwargs['filename']
+            res = [atch for atch in res if fuzz.partial_ratio(
+                atch.filename.lower(), filename.lower()) > self.thresh]
+        if kwargs.get('custom_filetype'):
+            filetype = kwargs['custom_filetype']
+            res = [atch for atch in res if fuzz.partial_ratio(
+                atch.filename.lower(), filetype.lower()) > self.thresh]
+        if kwargs.get("filetype"):
+            res = [atch for atch in res if atch.content_type == kwargs["filetype"]]
         if kwargs.get("banned_ids"):
-            return [attachment for attachment in res if attachment.id not in kwargs["banned_ids"]]
-        return list(res)
+            res = [atch for atch in res if atch.id not in kwargs["banned_ids"]]
+        return res
 
-    async def search(self, filename: str, onii_chan, ctx_channel, *args, **kwargs) -> List[Dict]:
+    async def search(self, onii_chan, ctx_channel, *args, **kwargs) -> List[Dict]:
         """
         Iterate through previous messages in a discord channel for files.
 
@@ -83,8 +88,9 @@ class PastFileSearch(AsyncSearchClient):
         Returns:
             A list of dicts of files.
         """
-        if self.user is None or not isinstance(filename, str):
+        if self.user is None:
             return ""
+
         files = []
         onii_chan = ctx_channel
         if kwargs.get('channel'):
@@ -96,7 +102,7 @@ class PastFileSearch(AsyncSearchClient):
 
         matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get('before'), after=kwargs.get('after'))
         async for message in matched_messages:
-            matched = self.match(message, filename, **kwargs)
+            matched = self.match(message, **kwargs)
             files.extend([{**attachment_to_search_dict(message, atch), 'url': atch.url,
                          'jump_url': message.jump_url} for atch in matched])
         return files

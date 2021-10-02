@@ -107,7 +107,6 @@ async def fdelete(ctx: SlashContext or commands.Context, filename: str, search_c
 
 
 async def fsearch(ctx: SlashContext or commands.Context,
-                  filename: str,
                   search_client: AsyncSearchClient,
                   bot: commands.Bot,
                   **kwargs) -> List[Dict]:
@@ -123,15 +122,11 @@ async def fsearch(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    if not filename:
-        return f"Couldn't process your query: `{filename}`"
-
     onii_chan = ctx.channel
     if ctx.guild is not None:
         onii_chan = ctx.guild
 
     files = await search_client.search(
-        filename,
         onii_chan,
         ctx.channel,
         **kwargs
