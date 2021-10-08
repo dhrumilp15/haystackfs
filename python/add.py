@@ -22,7 +22,7 @@ async def addservers():
     """Review total number of users."""
     res = await servers.count_documents({'bot_in_server': True})
     print(f'bot in server count: {res}')
-    res = await servers.count_documents({'bot_in_server': False})
+    res += await servers.count_documents({'bot_in_server': False})
     print(f'lifetime count: {res}')
 
 

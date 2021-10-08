@@ -26,10 +26,13 @@ class MgClient:
     def __init__(self, mongo_endpoint: str = None, db_name: str = None):
         """Initialize the MongoDB Client and database."""
         self.client, self.db = None, None
-        if mongo_endpoint and db_name:
-            self.client = AsyncIOMotorClient(mongo_endpoint)
-            self.db = self.client[db_name]
-            logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
+        try:
+            if mongo_endpoint and db_name:
+                self.client = AsyncIOMotorClient(mongo_endpoint)
+                self.db = self.client[db_name]
+                logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
+        except:
+            logger.info("Couldn't connect to MongoDB")
 
     async def get_file(self, file_id: int) -> dict:
         """
