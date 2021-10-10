@@ -45,7 +45,7 @@ class MgClient:
             The file url as a str.
         """
         if not self.db:
-            return {}
+            return dict()
         res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "file_name": 1})
         return res
 
