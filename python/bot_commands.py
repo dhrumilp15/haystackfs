@@ -125,10 +125,13 @@ async def fsearch(ctx: SlashContext or commands.Context,
     onii_chan = ctx.channel
     if ctx.guild is not None:
         onii_chan = ctx.guild
+    bot_user = None
+    if ctx.guild is not None:
+        bot_user = ctx.guild.me
 
     files = await search_client.search(
         onii_chan,
-        ctx.channel,
+        bot_user=bot_user,
         **kwargs
     )
     if not files:

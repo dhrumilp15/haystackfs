@@ -88,7 +88,7 @@ class Discordfs(commands.Cog):
         await ctx.defer(hidden=dm)
 
         if not any([filename, filetype, custom_filetype, author, channel, content, after, before, dm]):
-            await ctx.send(f"You must specify a parameter to search on!", hidden=True)
+            await ctx.send(f"You must specify a parameter to search on!", hidden=dm)
             return
 
         if before is not None:
@@ -100,6 +100,11 @@ class Discordfs(commands.Cog):
             after = parser.parse(after)
             after = datetime.datetime(*after.timetuple()[:3])
             after -= datetime.timedelta(microseconds=1)
+
+        if channel is not None and ctx.guild is not None:
+            if not channel.permissions_for(ctx.guild.me).read_message_history:
+                await ctx.send(f"I can't read messages in {channel.name}!", hidden=dm)
+
         files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot,
                               filename=filename, filetype=filetype, custom_filetype=custom_filetype,
                               author=author, content=content, channel=channel, after=after,
