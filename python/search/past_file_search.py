@@ -99,7 +99,7 @@ class PastFileSearch(AsyncSearchClient):
                          'jump_url': message.jump_url} for atch in matched])
         return files
 
-    async def search(self, onii_chan: discord.DMChannel or discord.Guild, *args, **kwargs) -> List[Dict]:
+    async def search(self, onii_chan: discord.DMChannel or discord.Guild, bot_user=None, *args, **kwargs) -> List[Dict]:
         """
         Search all channels in a Guild or the provided channel.
 
@@ -119,22 +119,14 @@ class PastFileSearch(AsyncSearchClient):
             kwargs['banned_ids'] = self.banned_file_ids
 
         if isinstance(onii_chan, discord.DMChannel):
-            try:
-                return await self.channel_search(onii_chan, *args, **kwargs)
-            except:
-                return []
+            return await self.channel_search(onii_chan, *args, **kwargs)
         if isinstance(kwargs.get("channel"), discord.TextChannel):
-            try:
-                return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
-            except:
-                return []
+            return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
         files = []
         for chan in onii_chan.text_channels:
-            try:
+            if chan.permissions_for(bot_user).read_message_history:
                 chan_files = await self.channel_search(chan, *args, **kwargs)
                 files.extend(chan_files)
-            except:
-                pass
         return files
 
     async def create_doc(self, *args, **kwargs):
