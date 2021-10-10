@@ -76,7 +76,7 @@ class PastFileSearch(AsyncSearchClient):
             res = [atch for atch in res if atch.id not in kwargs["banned_ids"]]
         return res
 
-    async def search(self, onii_chan, ctx_channel, *args, **kwargs) -> List[Dict]:
+    async def channel_search(self, onii_chan, *args, **kwargs) -> List[Dict]:
         """
         Iterate through previous messages in a discord channel for files.
 
@@ -92,20 +92,37 @@ class PastFileSearch(AsyncSearchClient):
             return ""
 
         files = []
-        onii_chan = ctx_channel
-        if kwargs.get('channel'):
-            onii_chan = kwargs['channel']
-        if kwargs.get('banned_ids'):
-            kwargs['banned_ids'].update(self.banned_file_ids)
-        else:
-            kwargs['banned_ids'] = self.banned_file_ids
-
         matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get('before'), after=kwargs.get('after'))
         async for message in matched_messages:
             matched = self.match(message, **kwargs)
             files.extend([{**attachment_to_search_dict(message, atch), 'url': atch.url,
                          'jump_url': message.jump_url} for atch in matched])
         return files
+
+    async def search(self, onii_chan: discord.DMChannel or discord.Guild, *args, **kwargs) -> List[Dict]:
+        """
+        Search all channels in a Guild or the provided channel.
+
+        Args:
+            onii_chan: The channel/guild to search
+            kawrgs: Search paramaters
+
+        Returns:
+            A list of dicts of files.
+        """
+        if self.user is None:
+            return []
+
+        if kwargs.get('banned_ids'):
+            kwargs['banned_ids'].update(self.banned_file_ids)
+        else:
+            kwargs['banned_ids'] = self.banned_file_ids
+
+        if isinstance(onii_chan, discord.DMChannel):
+            return await self.channel_search(onii_chan, *args, **kwargs)
+        if isinstance(kwargs.get("channel"), discord.TextChannel):
+            return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
+        return [file for chan in onii_chan.text_channels for file in await self.channel_search(chan, *args, **kwargs)]
 
     async def create_doc(self, *args, **kwargs):
         """We don't maintain search indices in this class, so this is not needed."""
@@ -117,5 +134,5 @@ class PastFileSearch(AsyncSearchClient):
 
     async def remove_doc(self, file_ids: list, *args, **kwargs):
         """Update banned ids with the file ids."""
-        self.banned_file_ids.add(tuple(file_ids))
-        return
+        for file_id in file_ids:
+            self.banned_file_ids.add(file_id)
