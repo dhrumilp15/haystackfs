@@ -119,10 +119,23 @@ class PastFileSearch(AsyncSearchClient):
             kwargs['banned_ids'] = self.banned_file_ids
 
         if isinstance(onii_chan, discord.DMChannel):
-            return await self.channel_search(onii_chan, *args, **kwargs)
+            try:
+                return await self.channel_search(onii_chan, *args, **kwargs)
+            except:
+                return []
         if isinstance(kwargs.get("channel"), discord.TextChannel):
-            return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
-        return [file for chan in onii_chan.text_channels for file in await self.channel_search(chan, *args, **kwargs)]
+            try:
+                return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
+            except:
+                return []
+        files = []
+        for chan in onii_chan.text_channels:
+            try:
+                chan_files = await self.channel_search(chan, *args, **kwargs)
+                files.extend(chan_files)
+            except:
+                pass
+        return files
 
     async def create_doc(self, *args, **kwargs):
         """We don't maintain search indices in this class, so this is not needed."""
