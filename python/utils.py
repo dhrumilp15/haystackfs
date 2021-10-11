@@ -110,7 +110,7 @@ def filter_messages_with_permissions(author: discord.User, files: List[Dict], pe
         # The user could only view messages posted *after* they were added.
         # If their query has images posted both before *and* after the user was
         # invited, what should we return?
-        if authorperms >= perm:
+        if authorperms.is_superset(perm):
             viewable_files.append(file)
     return viewable_files
 

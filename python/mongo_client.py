@@ -163,12 +163,13 @@ class MgClient:
                 logger.error(f"Failed to insert file with _id: {file.id}")
         return files_added
 
-    async def remove_file(self, file_ids: List[str]) -> bool:
+    async def remove_file(self, ids: List[str], field: str = "_id") -> bool:
         """
         Remove files.
 
         Args:
-            file_ids: A list of file ids to remove.
+            ids: A list of ids to remove.
+            field: The type of id to remove.
 
         Returns:
             Whether the file was succesfully removed.
@@ -176,7 +177,7 @@ class MgClient:
         if not self.db:
             return False
         files_coll = self.db.files
-        res = await files_coll.delete_many({"_id": {"$in": file_ids}})
+        res = await files_coll.delete_many({field: {"$in": ids}})
         return res.acknowledged
 
     async def dump_snapshot(self, collection):
@@ -234,13 +235,6 @@ class MgClient:
         else:
             logger.error(f"Failed to delete files with guild_id: {serv_id}")
         return res.acknowledged
-
-    async def verify(self, serv_id: int) -> bool:
-        """Verify a server."""
-        if not self.db:
-            return False
-        res = await self.db.servers.find_one({"_id": serv_id}, {"verified": 1})
-        return res["verified"]
 
     async def delete_files_from_inactive_servers(self) -> bool:
         """

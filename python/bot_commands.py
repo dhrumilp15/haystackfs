@@ -10,7 +10,6 @@ from typing import List, Dict
 
 
 async def fremove(ctx: SlashContext or commands.Context,
-                  filename: str,
                   search_client: AsyncSearchClient,
                   mg_client: MgClient,
                   bot: commands.Bot,
@@ -29,13 +28,11 @@ async def fremove(ctx: SlashContext or commands.Context,
         A list of filenames that were deleted
     """
     author = ctx.author
-    if not filename:
-        return f"Couldn't process your query: `{filename}`"
-    serv_id = ctx.channel.id
+    serv_id = ctx.channel
     if ctx.guild is not None:
-        serv_id = ctx.guild.id
+        serv_id = ctx.guild
 
-    files = await search_client.search(filename, serv_id, ctx.channel, **kwargs)
+    files = await search_client.search(serv_id, **kwargs)
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -58,7 +55,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     return manageable_files
 
 
-async def fdelete(ctx: SlashContext or commands.Context, filename: str, search_client: AsyncSearchClient,
+async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSearchClient,
                   mg_client: MgClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
     Remove files from our storage and delete their corresponding discord messages.
@@ -74,8 +71,6 @@ async def fdelete(ctx: SlashContext or commands.Context, filename: str, search_c
         A list of filenames that were deleted
     """
     author = ctx.author
-    if not filename:
-        return f"Couldn't process your query: `{filename}`"
     serv_id = ctx.channel.id
     if ctx.guild is not None:
         serv_id = ctx.guild.id

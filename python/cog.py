@@ -61,6 +61,11 @@ class Discordfs(commands.Cog):
         return self.search_client.initialize(*args, **kwargs)
 
     def log_command(function):
+        """
+        Log commands from the given function.
+
+        To be used with search, delete and remove functions.
+        """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
             await self.db_client.log_command(function, *args, **kwargs)
@@ -74,9 +79,9 @@ class Discordfs(commands.Cog):
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def _search(self, ctx: SlashContext, filename: str = None, filetype: str = None, custom_filetype: str = None,
-                      author: discord.User = None, channel: discord.channel = None, content: str = None, after: str = None,
-                      before: str = None, dm: bool = False):
+    async def slash_search(self, ctx: SlashContext, filename: str = None, filetype: str = None, custom_filetype: str = None,
+                           author: discord.User = None, channel: discord.channel = None, content: str = None, after: str = None,
+                           before: str = None, dm: bool = False):
         """
         Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
 
@@ -104,6 +109,7 @@ class Discordfs(commands.Cog):
         if channel is not None and ctx.guild is not None:
             if not channel.permissions_for(ctx.guild.me).read_message_history:
                 await ctx.send(f"I can't read messages in {channel.name}!", hidden=dm)
+                return
 
         files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot,
                               filename=filename, filetype=filetype, custom_filetype=custom_filetype,
@@ -126,7 +132,7 @@ class Discordfs(commands.Cog):
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def _delete(self, ctx, filename, **kwargs):
+    async def slash_delete(self, ctx, **kwargs):
         """
         Responds to `/delete`. Tries to remove docs related to a query and their respective discord messages.
 
@@ -135,7 +141,7 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
         """
         await ctx.defer(hidden=True)
-        deleted_files = await fdelete(ctx, filename, self.search_client, self.db_client, self.bot, **kwargs)
+        deleted_files = await fdelete(ctx, self.search_client, self.db_client, self.bot, **kwargs)
         if isinstance(deleted_files, str):
             await ctx.send(content=deleted_files, hidden=True)
             return
@@ -148,7 +154,7 @@ class Discordfs(commands.Cog):
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def _remove(self, ctx: SlashContext, filename: str, **kwargs):
+    async def slash_remove(self, ctx: SlashContext, **kwargs):
         """
         Responds to `/remove`. Tries to remove docs related to a query from applicable search indices.
 
@@ -157,7 +163,7 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
         """
         await ctx.defer(hidden=True)
-        removed_files = await fremove(ctx, filename, self.search_client, self.db_client, self.bot, **kwargs)
+        removed_files = await fremove(ctx, self.search_client, self.db_client, self.bot, **kwargs)
         if isinstance(removed_files, str):
             await ctx.send(content=removed_files, hidden=True)
             return
@@ -165,7 +171,7 @@ class Discordfs(commands.Cog):
 
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
     @log_command
-    async def search(self, ctx: commands.Context, filename: str):
+    async def classic_search(self, ctx: commands.Context, filename: str):
         """
         Find and send files related to a query.
 
@@ -181,7 +187,7 @@ class Discordfs(commands.Cog):
 
     @commands.command(name="delete", aliases=["del"], pass_context=True)
     @log_command
-    async def delete(self, ctx: commands.Context, filename: str):
+    async def classic_delete(self, ctx: commands.Context, filename: str):
         """
         Delete docs related to the given filename from ElasticSearch and their respective messages.
 
@@ -189,15 +195,15 @@ class Discordfs(commands.Cog):
             ctx: The commands.Context from which the command originated
             filename: A str of the filename to query for
         """
-        deleted_files = await fdelete(ctx, filename, self.search_client, self.db_client, self.bot)
-        if isinstance(deleted_files, str):
-            await ctx.author.send(deleted_files)
+        files = await fdelete(ctx, self.search_client, self.db_client, self.bot, filename=filename)
+        if isinstance(files, str):
+            await ctx.author.send(files)
             return
-        await ctx.author.send("Deleted: " + ' '.join(deleted_files))
+        await ctx.author.send("Deleted: " + ' '.join(files))
 
     @commands.command(name="remove", aliases=["rm"], pass_context=True)
     @log_command
-    async def remove(self, ctx, filename):
+    async def classic_remove(self, ctx, filename):
         """
         Remove docs related to the given filename from ElasticSearch.
 
@@ -205,19 +211,11 @@ class Discordfs(commands.Cog):
             ctx: The commands.Context from which the command originated
             filename: A str of the filename to query for
         """
-        removed_files = await fremove(ctx, filename, self.search_client, self.db_client, self.bot)
-        if isinstance(removed_files, str):
-            await ctx.author.send(removed_files)
+        files = await fremove(ctx, self.search_client, self.db_client, self.bot, filename=filename)
+        if isinstance(files, str):
+            await ctx.author.send(files)
             return
-        await ctx.author.send("Removed: " + ' '.join(removed_files))
-
-    @commands.Cog.listener()
-    async def on_slash_command(self, ctx: SlashContext):
-        """Attempt to create an index for a channel on each command."""
-        serv = ctx.channel
-        if ctx.guild is not None:
-            serv = ctx.guild
-        await self.db_client.add_server(serv)
+        await ctx.author.send("Removed: " + ' '.join(files))
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -237,42 +235,21 @@ class Discordfs(commands.Cog):
         serv = message.channel
         if message.guild is not None:
             serv = message.guild
-        await self.db_client.add_server(serv)
         for file in message.attachments:
             meta_dict = attachment_to_search_dict(message, file)
             await self.search_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
-            saved_files = await self.db_client.add_file(message)
-            # if saved_files:
-            # await message.channel.send(f"Saved {len(message.attachments)}
-            # file{'s' if len(message.attachments) > 1 else ''}")
-
+            await self.db_client.add_file(message)
         await self.bot.process_commands(message)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         """
-        Handle message deletion. Removes the respective documents from the index.
-
-        This is also called when we delete messages in `_delete()`, but that's not
-        a problem since we only remove docs from indices if they exist.
+        Remove respective documents from the database when they're deleted.
 
         Args:
             payload: A discord.RawMessageDeleteEvent event.
         """
-        if payload.cached_message is None:
-            onii_chan_id = payload.channel_id
-            chan = await self.bot.fetch_channel(onii_chan_id)
-        else:
-            message = payload.cached_message
-            # if the message is cached, we'll know whether the author is a bot user
-            if message.author == self.bot.user:
-                return
-            chan = message.channel
-            onii_chan_id = message.channel
-            if message.guild is not None:
-                onii_chan_id = message.guild
-        files = await self.search_client.search(payload.message_id, onii_chan_id, chan)
-        await self.search_client.remove_doc([file['objectID'] for file in files], onii_chan_id, "bot_deletion")
+        self.db_client.remove_file([payload.message_id], field="message_id")
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
@@ -329,10 +306,6 @@ class Discordfs(commands.Cog):
                     break
             embed.set_field_at(index=0, name=name, value=jump_url)
             await ctx.edit_origin(embed=embed)
-
-    async def cog_command_error(ctx, error):
-        """Command error."""
-        print(error)
 
     async def send_files_as_message(self, ctx: SlashContext, files: List[Dict], mg_client: MgClient):
         """
