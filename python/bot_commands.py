@@ -41,7 +41,7 @@ async def fremove(ctx: SlashContext or commands.Context,
         bot
     )
     if not manageable_files:
-        return f"I couldn't find any files related to `{filename}`"
+        return f"I couldn't find any files that you can access."
     res = await search_client.remove_doc(
         [file['objectID'] for file in manageable_files],
         serv_id,
@@ -74,7 +74,7 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
     serv_id = ctx.channel.id
     if ctx.guild is not None:
         serv_id = ctx.guild.id
-    files = await search_client.search(filename, serv_id, ctx.channel, **kwargs)
+    files = await search_client.search(serv_id, **kwargs)
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -82,7 +82,7 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
         bot
     )
     if not manageable_files:
-        return f"I couldn't find any files related to `{filename}`"
+        return f"I couldn't find any files that you can access."
     deleted_files = []
     await search_client.remove_doc(
         [file['objectID'] for file in manageable_files],
