@@ -78,10 +78,7 @@ class Discordfs(commands.Cog):
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
-    @log_command
-    async def slash_search(self, ctx: SlashContext, filename: str = None, filetype: str = None, custom_filetype: str = None,
-                           author: discord.User = None, channel: discord.channel = None, content: str = None, after: str = None,
-                           before: str = None, dm: bool = False):
+    async def slash_search(self, ctx: SlashContext, **kwargs):
         """
         Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
 
@@ -90,40 +87,41 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
         """
-        await ctx.defer(hidden=dm)
+        await ctx.defer(hidden=kwargs.get("dm", False))
+        try:
+            await self.db_client.log_command(**kwargs)
+        except:
+            pass
 
-        if not any([filename, filetype, custom_filetype, author, channel, content, after, before, dm]):
-            await ctx.send(f"You must specify a parameter to search on!", hidden=dm)
+        if not any(list(kwargs.values())):
+            await ctx.send(f"You must specify a parameter to search on!", hidden=kwargs.get("dm", False))
             return
 
-        if before is not None:
-            before = parser.parse(before)
+        if kwargs.get("before"):
+            before = parser.parse(kwargs.get("before"))
             # Long way to do it but I'm not sure how else to do this
             before = datetime.datetime(*before.timetuple()[:3])
             before += datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-        if after is not None:
-            after = parser.parse(after)
+        if kwargs.get("after"):
+            after = parser.parse(kwargs.get("after"))
             after = datetime.datetime(*after.timetuple()[:3])
             after -= datetime.timedelta(microseconds=1)
 
-        if channel is not None and ctx.guild is not None:
-            if not channel.permissions_for(ctx.guild.me).read_message_history:
-                await ctx.send(f"I can't read messages in {channel.name}!", hidden=dm)
+        if kwargs.get("channel") and ctx.guild is not None:
+            if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
+                await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
                 return
 
-        files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot,
-                              filename=filename, filetype=filetype, custom_filetype=custom_filetype,
-                              author=author, content=content, channel=channel, after=after,
-                              before=before)
+        files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
         # TODO: Better Error Handling
         if isinstance(files, str):
             await ctx.send(content=files, hidden=True)
             return
         author = ctx
-        if dm:
+        if kwargs.get("dm"):
             author = ctx.author
             await ctx.send("DM'ing your files...", hidden=True)
-        await self.send_files_as_message(author, files, self.db_client)
+        await self.send_files_as_message(author, files)
 
     @cog_ext.cog_slash(
         name="delete",
@@ -183,7 +181,7 @@ class Discordfs(commands.Cog):
         if isinstance(files, str):
             await ctx.author.send(content=files)
             return
-        await self.send_files_as_message(ctx, files, self.db_client)
+        await self.send_files_as_message(ctx, files)
 
     @commands.command(name="delete", aliases=["del"], pass_context=True)
     @log_command
@@ -307,7 +305,7 @@ class Discordfs(commands.Cog):
             embed.set_field_at(index=0, name=name, value=jump_url)
             await ctx.edit_origin(embed=embed)
 
-    async def send_files_as_message(self, ctx: SlashContext, files: List[Dict], mg_client: MgClient):
+    async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
         """
         Send files as a message to ctx.
 
@@ -342,7 +340,7 @@ class Discordfs(commands.Cog):
         mediaUrl = files[0].get('jump_url')
         if not mediaUrl:
             file_id = files[0]['objectID']
-            res = await mg_client.get_file(file_id)
+            res = await self.db_client.get_file(file_id)
             mediaUrl = res['url']
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
         await ctx.send(f"Found {files[0]['file_name']} {'and more...' if len(files) > 1 else ''}", embed=embed, components=[action_row])
