@@ -19,6 +19,7 @@ import datetime
 from dateutil import parser
 import glob
 from typing import List, Dict
+import io
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -72,15 +73,9 @@ class Discordfs(commands.Cog):
             return await function(self, *args, **kwargs)
         return wrapper
 
-    @cog_ext.cog_slash(
-        name="search",
-        description="Search for files.",
-        options=search_options,
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
-    )
-    async def slash_search(self, ctx: SlashContext, **kwargs):
+    async def locate(self, ctx: SlashContext, **kwargs):
         """
-        Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
+        Common code between search and export; turn arguments into a search, and return the files.
 
         Args:
             ctx: The SlashContext from which the command originated
@@ -117,11 +112,54 @@ class Discordfs(commands.Cog):
         if isinstance(files, str):
             await ctx.send(content=files, hidden=True)
             return
+        return files
+
+    @cog_ext.cog_slash(
+        name="search",
+        description="Search for files.",
+        options=search_options,
+        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+    )
+    async def slash_search(self, ctx: SlashContext, **kwargs):
+        """
+        Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
+
+        Args:
+            ctx: The SlashContext from which the command originated
+            filename: A str of the filename to query for.
+            DM: A bool for whether to dm the author the results.
+        """
+        files = await self.locate(ctx, **kwargs)
         author = ctx
         if kwargs.get("dm"):
             author = ctx.author
             await ctx.send("DM'ing your files...", hidden=True)
+
         await self.send_files_as_message(author, files)
+
+    @cog_ext.cog_slash(
+        name="export",
+        description="Get export script for files.",
+        options=search_options,
+        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+    )
+    async def slash_export(self, ctx: SlashContext, **kwargs):
+        """
+        Responds to `/export`. Tries get a download script for all files related to a query from ElasticSearch.
+
+        Args:
+            ctx: The SlashContext from which the command originated
+            filename: A str of the filename to query for.
+            DM: A bool for whether to dm the author the results.
+        """
+        files = await self.locate(ctx, **kwargs)
+
+        author = ctx
+        if kwargs.get("dm"):
+            author = ctx.author
+            await ctx.send("DM'ing your files...", hidden=True)
+
+        await self.send_files_as_script(author, files)
 
     @cog_ext.cog_slash(
         name="delete",
@@ -304,6 +342,19 @@ class Discordfs(commands.Cog):
                     break
             embed.set_field_at(index=0, name=name, value=jump_url)
             await ctx.edit_origin(embed=embed)
+
+    async def send_files_as_script(self, ctx:SlashContext, files: List[Dict]):
+        """
+        Send a list of Discord files as a script to download them.
+
+        Args:
+            ctx: The originating context.
+            files: The files to send to the context.
+        """
+
+        f = io.BytesIO(bytes(str(files), 'utf-8'))
+        await ctx.send(file=discord.File(f, filename="export.py"))
+        f.close()
 
     async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
         """
