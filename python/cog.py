@@ -32,6 +32,11 @@ formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
+EXP_TEMPLATE_SPLIT_IDX = 9
+export_template = []
+with open("python/export_template.py") as f:
+    export_template = f.readlines()
+
 
 class Discordfs(commands.Cog):
     """Main class for the bot."""
@@ -352,7 +357,16 @@ class Discordfs(commands.Cog):
             files: The files to send to the context.
         """
 
-        f = io.BytesIO(bytes(str(files), 'utf-8'))
+        script_top = export_template[0:EXP_TEMPLATE_SPLIT_IDX]
+        dict_strs = list(map(lambda d: str(d) + ',', files))
+        script_bottom = export_template[EXP_TEMPLATE_SPLIT_IDX:]
+        script_lines = []
+        script_lines.extend(script_top)
+        script_lines.extend(dict_strs)
+        script_lines.extend(script_bottom)
+        script = '\n'.join(script_lines)
+
+        f = io.BytesIO(bytes(script, 'utf-8'))
         await ctx.send(file=discord.File(f, filename="export.py"))
         f.close()
 
