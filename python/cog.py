@@ -7,6 +7,7 @@ from search.algolia_client import AlgoliaClient
 from mongo_client import MgClient
 from utils import attachment_to_search_dict, search_options
 from bot_commands import fdelete, fremove, fsearch
+from export_template import generate_script
 from config import CONFIG
 import logging
 from discord_slash import SlashContext, cog_ext
@@ -31,12 +32,6 @@ fh = logging.FileHandler('main.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
-
-EXP_TEMPLATE_SPLIT_IDX = 9
-export_template = []
-with open("python/export_template.py") as f:
-    export_template = f.readlines()
-
 
 class Discordfs(commands.Cog):
     """Main class for the bot."""
@@ -350,25 +345,17 @@ class Discordfs(commands.Cog):
 
     async def send_files_as_script(self, ctx:SlashContext, files: List[Dict]):
         """
-        Send a list of Discord files as a script to download them.
+        Send a list of Discord files as a Python script to download them.
 
         Args:
             ctx: The originating context.
             files: The files to send to the context.
         """
 
-        script_top = export_template[0:EXP_TEMPLATE_SPLIT_IDX]
-        dict_strs = list(map(lambda d: str(d) + ',', files))
-        script_bottom = export_template[EXP_TEMPLATE_SPLIT_IDX:]
-        script_lines = []
-        script_lines.extend(script_top)
-        script_lines.extend(dict_strs)
-        script_lines.extend(script_bottom)
-        script = '\n'.join(script_lines)
+        script = generate_script(files)
 
-        f = io.BytesIO(bytes(script, 'utf-8'))
-        await ctx.send(file=discord.File(f, filename="export.py"))
-        f.close()
+        with io.BytesIO(bytes(script, 'utf-8')) as f:
+            await ctx.send(file=discord.File(f, filename="export.py"))
 
     async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
         """
