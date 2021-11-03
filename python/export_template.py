@@ -1,14 +1,13 @@
 from typing import List, Dict
 
-template_top = """
-#!/usr/bin/env python3
+template_top = """#!/usr/bin/env python3.6
 
 # This script will download all the files you requested.
 # To run it, you will need Python 3 installed on your computer.
 # For Windows, you can install it from the MS store, or from
 # https://www.python.org/downloads/windows/
 # For macOS, you can install it from https://www.python.org/downloads/macos/
-# For Linux, use your distor's package manager.
+# For Linux, use your distro's package manager.
 # If you need help running the script, see
 # https://realpython.com/run-python-scripts/#how-to-run-python-scripts-using-the-command-line
 
@@ -25,6 +24,7 @@ headers = {
 }
 
 files = ["""
+
 template_bottom = """]
 
 if not os.path.exists(root_dir):
@@ -33,7 +33,7 @@ if not os.path.exists(root_dir):
 for f in files:
     path = os.path.join(root_dir, str(f["channel_id"]), f["file_name"])
     if os.path.exists(path):
-        print(f"Skipping {f['url']} (already downloaded)")
+        print(f"Skipping {f['file_name']} (already downloaded)")
         continue
     print(f"Fetching {f['url']}")
     finished = False
@@ -41,7 +41,11 @@ for f in files:
         req = request.Request(f["url"], {}, headers)
         with request.urlopen(req) as url:
             if url.status == HTTPStatus.TOO_MANY_REQUESTS:
-                retry_after = json.loads(url.body)["retry_after"]
+                try:
+                    retry_after = json.loads(url.body)["retry_after"]
+                except Exception as e:
+                    print(f"Error loading API response: {e}")
+                    retry_after = 5
                 print(f"Being rate limited, waiting for {retry_after} seconds")
                 sleep(retry_after)
                 continue

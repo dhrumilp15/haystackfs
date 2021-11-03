@@ -19,7 +19,7 @@ import discord
 import datetime
 from dateutil import parser
 import glob
-from typing import List, Dict
+from typing import List, Dict, Tuple, Union
 import io
 
 guild_ids = []
@@ -73,7 +73,9 @@ class Discordfs(commands.Cog):
             return await function(self, *args, **kwargs)
         return wrapper
 
-    async def locate(self, ctx: SlashContext, **kwargs):
+    async def locate(
+        self, ctx: SlashContext, **kwargs
+    ) -> Tuple[Union[SlashContext, discord.member.Member, discord.user.ClientUser], List[Dict]]:
         """
         Common code between search and export; turn arguments into a search, and return the files.
 
@@ -81,6 +83,8 @@ class Discordfs(commands.Cog):
             ctx: The SlashContext from which the command originated
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
+
+        Returns a destination that has a .send method, and a list of files.
         """
         await ctx.defer(hidden=kwargs.get("dm", False))
         try:
@@ -112,7 +116,13 @@ class Discordfs(commands.Cog):
         if isinstance(files, str):
             await ctx.send(content=files, hidden=True)
             return
-        return files
+
+        recipient = ctx
+        if kwargs.get("dm"):
+            recipient = ctx.author
+            await ctx.send("DM'ing your files...", hidden=True)
+
+        return (recipient, files)
 
     @cog_ext.cog_slash(
         name="search",
@@ -129,17 +139,12 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
         """
-        files = await self.locate(ctx, **kwargs)
-        author = ctx
-        if kwargs.get("dm"):
-            author = ctx.author
-            await ctx.send("DM'ing your files...", hidden=True)
-
-        await self.send_files_as_message(author, files)
+        recipient, files = await self.locate(ctx, **kwargs)
+        await self.send_files_as_message(recipient, files)
 
     @cog_ext.cog_slash(
         name="export",
-        description="Get Python export script to download the results to your computer.",
+        description="Get a Python export script to download the files returned in a search to your computer.",
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
@@ -148,18 +153,14 @@ class Discordfs(commands.Cog):
         Responds to `/export`. Tries get a download script for all files related to a query from ElasticSearch.
 
         Args:
-            ctx: The SlashContext from which the command originated
-            filename: A str of the filename to query for.
+            ctx: The SlashContext from which the command originated.
+            filename: A str of the filename to query for, if any.
             DM: A bool for whether to dm the author the results.
         """
-        files = await self.locate(ctx, **kwargs)
+        recipient, files = await self.locate(ctx, **kwargs)
 
-        author = ctx
-        if kwargs.get("dm"):
-            author = ctx.author
-            await ctx.send("DM'ing your files...", hidden=True)
-
-        await self.send_files_as_script(author, files)
+        with io.StringIO(generate_script(files)) as f:
+            await recipient.send(f"Run this script to download the {len(files)} files.", file=discord.File(f, filename="export.py"))
 
     @cog_ext.cog_slash(
         name="delete",
@@ -342,20 +343,6 @@ class Discordfs(commands.Cog):
                     break
             embed.set_field_at(index=0, name=name, value=jump_url)
             await ctx.edit_origin(embed=embed)
-
-    async def send_files_as_script(self, ctx:SlashContext, files: List[Dict]):
-        """
-        Send a list of Discord files as a Python script to download them.
-
-        Args:
-            ctx: The originating context.
-            files: The files to send to the context.
-        """
-
-        script = generate_script(files)
-
-        with io.BytesIO(bytes(script, 'utf-8')) as f:
-            await ctx.send(file=discord.File(f, filename="export.py"))
 
     async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
         """
