@@ -139,7 +139,7 @@ class Discordfs(commands.Cog):
 
     @cog_ext.cog_slash(
         name="export",
-        description="Get export script for files.",
+        description="Get Python export script to download the results to your computer.",
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
