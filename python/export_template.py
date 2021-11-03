@@ -12,8 +12,11 @@ template_top = """
 # If you need help running the script, see
 # https://realpython.com/run-python-scripts/#how-to-run-python-scripts-using-the-command-line
 
+from http import HTTPStatus
 from urllib import request
+import json
 import os
+from time import sleep
 
 
 root_dir = "discordfs-export"
@@ -33,16 +36,26 @@ for f in files:
         print(f"Skipping {f['url']} (already downloaded)")
         continue
     print(f"Fetching {f['url']}")
-    req = request.Request(f["url"], {}, headers)
-    with request.urlopen(req) as url:
-        if url.status == 429:
-            print("Timeout")
-        b = url.read()
-        if not os.path.exists(os.path.join(root_dir, str(f["channel_id"]))):
-            os.mkdir(os.path.join(root_dir, str(f["channel_id"])))
-        path = os.path.join(path)
-        with open(path, "wb") as out:
-            out.write(b)
+    finished = False
+    while not finished:
+        req = request.Request(f["url"], {}, headers)
+        with request.urlopen(req) as url:
+            if url.status == HTTPStatus.TOO_MANY_REQUESTS:
+                retry_after = json.loads(url.body)["retry_after"]
+                print(f"Being rate limited, waiting for {retry_after} seconds")
+                sleep(retry_after)
+                continue
+            elif url.status != HTTPStatus.OK:
+                print(f"Error: HTTP request returned {url.status}")
+                finished = True
+                continue
+            b = url.read()
+            if not os.path.exists(os.path.join(root_dir, str(f["channel_id"]))):
+                os.mkdir(os.path.join(root_dir, str(f["channel_id"])))
+            path = os.path.join(path)
+            with open(path, "wb") as out:
+                out.write(b)
+            finished = True
 """
 
 def generate_script(files: List[Dict]) -> str:
