@@ -25,13 +25,18 @@ headers = {
 
 files = ["""
 
-template_bottom = """]
+template_middle = """]
+
+channels = """
+
+template_bottom = """
 
 if not os.path.exists(root_dir):
     os.mkdir(root_dir)
 
 for f in files:
-    path = os.path.join(root_dir, str(f["channel_id"]), f["file_name"])
+    channel = channels[str(f["channel_id"])]
+    path = os.path.join(root_dir, channel, f["file_name"])
     if os.path.exists(path):
         print(f"Skipping {f['file_name']} (already downloaded)")
         continue
@@ -54,15 +59,15 @@ for f in files:
                 finished = True
                 continue
             b = url.read()
-            if not os.path.exists(os.path.join(root_dir, str(f["channel_id"]))):
-                os.mkdir(os.path.join(root_dir, str(f["channel_id"])))
+            if not os.path.exists(os.path.join(root_dir, channel)):
+                os.mkdir(os.path.join(root_dir, channel))
             path = os.path.join(path)
             with open(path, "wb") as out:
                 out.write(b)
             finished = True
 """
 
-def generate_script(files: List[Dict]) -> str:
+def generate_script(files: List[Dict], channels: Dict) -> str:
     """Generates the contents of a script file."""
     dict_strs = list(map(lambda d: str(d) + ',', files))
-    return template_top + '\n'.join(dict_strs) + template_bottom
+    return template_top + '\n'.join(dict_strs) + template_middle + str(channels) + template_bottom

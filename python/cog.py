@@ -158,8 +158,11 @@ class Discordfs(commands.Cog):
             DM: A bool for whether to dm the author the results.
         """
         recipient, files = await self.locate(ctx, **kwargs)
+        channels = {}
+        for c in ctx.guild.channels:
+            channels[str(c.id)] = c.name
 
-        with io.StringIO(generate_script(files)) as f:
+        with io.StringIO(generate_script(files, channels)) as f:
             await recipient.send(f"Run this script to download the {len(files)} files.", file=discord.File(f, filename="export.py"))
 
     @cog_ext.cog_slash(
