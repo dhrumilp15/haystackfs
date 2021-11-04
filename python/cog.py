@@ -21,6 +21,7 @@ from dateutil import parser
 import glob
 from typing import List, Dict, Tuple, Union
 import io
+import re
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -161,8 +162,12 @@ class Discordfs(commands.Cog):
         channels = {}
         for c in ctx.guild.channels:
             channels[str(c.id)] = c.name
+        export_name = re.sub(r"[^A-Za-z0-9'\-\_ ]", "", ctx.guild.name)
+        if export_name == "":
+            # server name contains only unsupported characters
+            export_name = "export"
 
-        with io.StringIO(generate_script(files, channels)) as f:
+        with io.StringIO(generate_script(export_name, files, channels)) as f:
             await recipient.send(f"Run this script to download the {len(files)} files.", file=discord.File(f, filename="export.py"))
 
     @cog_ext.cog_slash(
