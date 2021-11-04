@@ -159,9 +159,11 @@ class Discordfs(commands.Cog):
             DM: A bool for whether to dm the author the results.
         """
         recipient, files = await self.locate(ctx, **kwargs)
+        needed_channel_ids = set(f["channel_id"] for f in files)
         channels = {}
         for c in ctx.guild.channels:
-            channels[str(c.id)] = c.name
+            if c.id in needed_channel_ids:
+                channels[str(c.id)] = c.name
         export_name = re.sub(r"[^A-Za-z0-9'\-\_ ]", "", ctx.guild.name)
         if export_name == "":
             # server name contains only unsupported characters
