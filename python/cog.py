@@ -22,6 +22,7 @@ import glob
 from typing import List, Dict, Tuple, Union
 import io
 import re
+import hashlib
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -95,7 +96,7 @@ class Discordfs(commands.Cog):
 
         if not kwargs:
             await ctx.send(f"You must specify a parameter to search on!", hidden=False)
-            return
+            return ctx, []
 
         if kwargs.get("before"):
             before = parser.parse(kwargs.get("before"))
@@ -110,13 +111,13 @@ class Discordfs(commands.Cog):
         if kwargs.get("channel") and ctx.guild is not None:
             if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
                 await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
-                return
+                return ctx, []
 
         files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
         # TODO: Better Error Handling
         if isinstance(files, str):
             await ctx.send(content=files, hidden=True)
-            return
+            return ctx, []
 
         recipient = ctx
         if kwargs.get("dm"):
@@ -141,7 +142,8 @@ class Discordfs(commands.Cog):
             DM: A bool for whether to dm the author the results.
         """
         recipient, files = await self.locate(ctx, **kwargs)
-        await self.send_files_as_message(recipient, files)
+        if files:
+            await self.send_files_as_message(recipient, files)
 
     @cog_ext.cog_slash(
         name="export",
@@ -159,18 +161,33 @@ class Discordfs(commands.Cog):
             DM: A bool for whether to dm the author the results.
         """
         recipient, files = await self.locate(ctx, **kwargs)
-        needed_channel_ids = set(f["channel_id"] for f in files)
-        channels = {}
-        for c in ctx.guild.channels:
-            if c.id in needed_channel_ids:
-                channels[str(c.id)] = c.name
-        export_name = re.sub(r"[^A-Za-z0-9'\-\_ ]", "", ctx.guild.name)
-        if export_name == "":
-            # server name contains only unsupported characters
-            export_name = "export"
+        if not files:
+            return
 
-        with io.StringIO(generate_script(export_name, files, channels)) as f:
-            await recipient.send(f"Run this script to download the {len(files)} files.", file=discord.File(f, filename="export.py"))
+        # So file names are maximally compatible.
+        sanitize = lambda s, default: re.sub(r"[^A-Za-z0-9'\-\_ ]", "", s).rstrip() or default
+
+        # Restrict to channels that the search returns files for. This is so that the
+        # script does not leak the full server channel list every export. This mapping
+        # is required so the export script can save files in directories named by the channels.
+        needed_ids = set(f["channel_id"] for f in files)
+        channels = {
+            str(c.id): sanitize(c.name, str(c.id))
+            for c in ctx.guild.channels
+            if c.id in needed_ids
+        }
+
+        guild_name = sanitize(ctx.guild.name, "export")
+
+        # This is so that if one is running multiple exports in a server,
+        # they don't get export(1).py etc.
+        unique_suffix = hashlib.sha256(bytes(str(sorted(f["url"] for f in files)), "utf-8")).hexdigest()[:5]
+        filename = f"export_{guild_name}_{unique_suffix}.py"
+        with io.StringIO(generate_script(guild_name, files, channels)) as export_script:
+            await recipient.send(
+                f"Found {len(files)} file(s). Run this script to download them.",
+                file=discord.File(export_script, filename=filename)
+            )
 
     @cog_ext.cog_slash(
         name="delete",
