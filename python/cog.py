@@ -93,9 +93,9 @@ class Discordfs(commands.Cog):
         except:
             pass
 
-        if not kwargs:
-            await ctx.send(f"You must specify a parameter to search on!", hidden=False)
-            return
+        # if not kwargs:
+        #     await ctx.send(f"You must specify a parameter to search on!", hidden=False)
+        #     return
 
         if kwargs.get("before"):
             before = parser.parse(kwargs.get("before"))
