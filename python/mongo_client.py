@@ -47,6 +47,17 @@ class MgClient:
         return res
 
     async def log_command(self, command, *args, **kwargs) -> bool:
+        """
+        Log commands to the database.
+
+        Args:
+            command: The user command
+            args: Arbitrary arguments, usually context
+            kwargs: Query parameters
+
+        Returns:
+            Whether the log operation was successful
+        """
         if not self.db:
             return False
         ctx = args[0]
@@ -97,6 +108,20 @@ class MgClient:
             return res.acknowledged
         except:
             return False
+
+    async def clear_message_content(self) -> bool:
+        """
+        Clear message content for files that have been stored for more than 30 days. We use a buffer of 1 day.
+
+        Returns:
+            Whether the update operation was successful.
+        """
+        if not self.db:
+            return False
+        files_coll = self.db.files
+        current_time = datetime.now() - datetime.timedelta(days=29)
+        await files_coll.update_many({"timestamp": {"$lt": current_time}},
+                                     {"$set": {"content": "REMOVED AFTER 30 DAYS"}})
 
     async def remove_server(self, server_id: int) -> bool:
         """

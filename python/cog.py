@@ -1,5 +1,7 @@
 """Cog class."""
+from cryptography.fernet import Fernet
 from functools import wraps
+from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
 from search.searcher import Searcher
@@ -35,13 +37,17 @@ logger.addHandler(fh)
 class Discordfs(commands.Cog):
     """Main class for the bot."""
 
-    def __init__(self, guild_ids: list, bot, search_client: AsyncSearchClient, db_client: MgClient):
+    def __init__(self, guild_ids: list, bot,
+                 search_client: AsyncSearchClient,
+                 db_client: MgClient,
+                 sme: SymmetricMessageEncryptor):
         """Instantiate the bot."""
         self.bot = bot
         self.guild_ids = guild_ids
         self.owner = None
         self.search_client = search_client
         self.db_client = db_client
+        self.sme = sme
         self.initialize_clients(self.bot.user)
 
     @commands.Cog.listener()
@@ -111,7 +117,6 @@ class Discordfs(commands.Cog):
             if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
                 await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
                 return
-
         files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
         # TODO: Better Error Handling
         if isinstance(files, str):
@@ -234,6 +239,7 @@ class Discordfs(commands.Cog):
         if message.guild is not None:
             serv = message.guild
         for file in message.attachments:
+            message.content = self.sme.encrypt(message.content)
             meta_dict = attachment_to_search_dict(message, file)
             await self.search_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
             await self.db_client.add_file(message)
@@ -286,6 +292,11 @@ class Discordfs(commands.Cog):
             snaps = sorted(glob.glob(f"{getattr(CONFIG, 'DB_NAME', 'normal')}_files/*"), reverse=True)[0]
             await self.db_client.load_from_snapshot(snaps)
             logger.debug("Database restored!")
+
+    @tasks.loop(hours=24)
+    async def clear_irrelevant_docs(self):
+        """Run a simple cleaner every 24 hours."""
+        await self.db_client.clear_message_content()
 
     @commands.Cog.listener()
     async def on_component(self, ctx: ComponentContext):
@@ -359,4 +370,5 @@ def setup(bot):
     # searcher = Searcher(ag_client, PastFileSearch())
     searcher = PastFileSearch()
     mg_client = MgClient(getattr(CONFIG, 'MONGO_ENDPOINT', None), getattr(CONFIG, 'DB_NAME', None))
-    bot.add_cog(Discordfs(guild_ids, bot, searcher, mg_client))
+    sme = SymmetricMessageEncryptor(Fernet, CONFIG)
+    bot.add_cog(Discordfs(guild_ids, bot, searcher, mg_client, sme))
