@@ -247,7 +247,7 @@ class Discordfs(commands.Cog):
         Args:
             payload: A discord.RawMessageDeleteEvent event.
         """
-        self.db_client.remove_file([payload.message_id], field="message_id")
+        await self.db_client.remove_file([payload.message_id], field="message_id")
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
