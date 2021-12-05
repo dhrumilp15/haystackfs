@@ -1,8 +1,8 @@
-# Discordfs
+# Haystackfs
 
-Discord's search bar leaves much to be desired when searching for files. Sure, you can search for files with `has:file`, but you can't search **by filename** or **file content**. That's what `discordfs` aims to solve.
+Discord's search bar leaves much to be desired when searching for files. Sure, you can search for files with `has:file`, but you can't search **by filename** or **file content**. That's what `haystackfs` aims to solve.
 
-With `discordfs`, you can search for files **by filename** with a simple command: `/search [filename]`!
+With `haystackfs`, you can search for files **by filename** with a simple command: `/search [filename]`!
 
 Files you upload are *immediately* indexed so that you can search for files as soon as you send them.
 
