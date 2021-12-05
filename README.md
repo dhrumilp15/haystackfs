@@ -4,6 +4,8 @@ Discord's search bar leaves much to be desired when searching for files. Sure, y
 
 With `haystackfs`, you can search for files **by filename** with a simple command: `/search [filename]`!
 
+![Epic demo](demo/hfs_demo.gif)
+
 Files you upload are *immediately* indexed so that you can search for files as soon as you send them.
 
 [**Click here to add the bot to your server**](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands) and [**click here to join the community**](https://discord.gg/rp8aZSjevn).
