@@ -1,6 +1,6 @@
 """Cog class."""
 from cryptography.fernet import Fernet
-from functools import wraps
+from functools import reduce, wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
@@ -294,7 +294,7 @@ class Discordfs(commands.Cog):
             logger.debug("Database restored!")
 
     @tasks.loop(hours=24)
-    async def clear_irrelevant_docs(self):
+    async def clear_messages(self):
         """Run a simple cleaner every 24 hours."""
         await self.db_client.clear_message_content()
 
@@ -313,7 +313,12 @@ class Discordfs(commands.Cog):
                 if opt['value'] == jump_url:
                     name = opt['label']
                     break
-            embed.set_field_at(index=0, name=name, value=jump_url)
+            make_jump, media_url = jump_url.split(',')
+            mj = make_jump.split('/')
+            make_jump = f"https://discord.com/channels/{make_jump}"
+            media_url = f"https://cdn.discordapp.com/attachments/{mj[1]}/{media_url}"
+            embed.set_field_at(index=0, name=name, value=make_jump)
+            embed.set_image(url=media_url)
             await ctx.edit_origin(embed=embed)
 
     async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
@@ -326,27 +331,37 @@ class Discordfs(commands.Cog):
             mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
         files = files[:25]
+        jump_url_length = len("https://discord.com/channels/")
         # TODO: Display all of the files in the embed if file count <= 5
         if len(files) <= 5:
-            buttons = [create_button(style=ButtonStyle.URL, label=f['file_name'], url=f['jump_url']) for f in files]
+            buttons = [create_button(style=ButtonStyle.URL,
+                                     label=f['file_name'],
+                                     url=f['jump_url']) for f in files]
             action_row = create_actionrow(*buttons)
         else:
             # TODO: Sort the files in the select
+            options = []
+            for file in files:
+                reduced_jump_url = file['jump_url'][jump_url_length:]
+                reduced_media_url = '/'.join(file['url'].split('/')[-2:])
+                option = create_select_option(
+                    label=file['file_name'],
+                    value=','.join([reduced_jump_url, reduced_media_url])
+                )
+                options.append(option)
             select = create_select(
-                options=[create_select_option(file['file_name'], value=file['jump_url']) for file in files],
+                options=options,
                 placeholder="Choose your files here!",
                 min_values=1,
-                max_values=1,
+                max_values=1
             )
             action_row = create_actionrow(select)
         embed = discord.Embed(
             title=f"Found {len(files)} file{'s' if len(files) > 1 else ''}",
-            color=discord.Colour.teal(),
-        )
+            color=discord.Colour.teal())
         embed.set_footer(
             text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
-            icon_url=self.bot.user.avatar_url
-        )
+            icon_url=self.bot.user.avatar_url)
         filename = files[0].get('file_name')
         mediaUrl = files[0].get('jump_url')
         if not mediaUrl:
@@ -354,7 +369,10 @@ class Discordfs(commands.Cog):
             res = await self.db_client.get_file(file_id)
             mediaUrl = res['url']
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
-        await ctx.send(f"Found {files[0]['file_name']} {'and more...' if len(files) > 1 else ''}", embed=embed, components=[action_row])
+        if 'image' in files[0]['filetype']:
+            embed.set_image(url=files[0]['url'])
+        await ctx.send(f"Found {files[0]['file_name']} {'and more...' if len(files) > 1 else ''}",
+                       embed=embed, components=[action_row])
 
 
 def setup(bot):
