@@ -23,6 +23,13 @@ CONTENT_TYPE_CHOICES = sorted([
 
 ], key=lambda x: x['name'])
 
+dm_option = create_option(
+    name="dm",
+    description="If `True`, I'll dm you what I find. \
+                Otherwise, I'll send it to this channel",
+    option_type=SlashCommandOptionType.BOOLEAN,
+    required=False)
+
 search_options = [
     create_option(
         name="filename",
@@ -75,13 +82,7 @@ search_options = [
         option_type=SlashCommandOptionType.STRING,
         required=False
     ),
-    create_option(
-        name="dm",
-        description="If `True`, I'll dm you what I find. \
-                Otherwise, I'll send it to this channel",
-        option_type=SlashCommandOptionType.BOOLEAN,
-        required=False,
-    ),
+    dm_option
 ]
 
 

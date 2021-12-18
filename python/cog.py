@@ -7,7 +7,7 @@ from search.past_file_search import PastFileSearch
 from search.searcher import Searcher
 from search.algolia_client import AlgoliaClient
 from mongo_client import MgClient
-from utils import attachment_to_search_dict, search_options
+from utils import attachment_to_search_dict, search_options, dm_option
 from bot_commands import fdelete, fremove, fsearch
 from config import CONFIG
 import logging
@@ -77,6 +77,39 @@ class Discordfs(commands.Cog):
             await self.db_client.log_command(function, *args, **kwargs)
             return await function(self, *args, **kwargs)
         return wrapper
+
+    @cog_ext.cog_slash(
+        name="help",
+        description="A help command",
+        options=[dm_option],
+        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+    )
+    async def slash_help(self, ctx: SlashContext, dm: bool = False):
+        await ctx.defer(hidden=dm)
+        embed = discord.Embed(
+            title=f'{self.bot.user.name}',
+            color=discord.Color.teal()
+        )
+        embed.add_field(name=f"What does {self.bot.user.name} do?",
+                        value=f"Use {self.bot.user.name} to search for your discord files.\n"
+                        "Use commands to search, delete or remove files.\n"
+                        "Specifying search options can refine your queries.")
+        embed.add_field(name="Search",
+                        value="Use `/search` to search for files. Selecting no options retrieves all files.", inline=False)
+        embed.add_field(name="Delete",
+                        value="Use `/delete` to specify files to delete", inline=False)
+        embed.add_field(name="Remove",
+                        value="Use `/remove` to specify files to make unsearchable", inline=False)
+        embed.add_field(name="Search Options",
+                        value="Use these to further refine your search queries!",
+                        inline=False)
+        for search_opt in search_options:
+            embed.add_field(name=search_opt['name'],
+                            value=search_opt['description'])
+        embed.set_footer(
+            text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
+            icon_url=self.bot.user.avatar_url)
+        await ctx.send(embed=embed)
 
     @cog_ext.cog_slash(
         name="search",
