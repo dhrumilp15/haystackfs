@@ -222,13 +222,6 @@ class Discordfs(commands.Cog):
             return
         await ctx.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
 
-    @commands.command(name="help", alases=['h'])
-    @log_command
-    async def classic_help(self, ctx: commands.Context):
-        """Respond to help command."""
-        embed = self.build_help_embed()
-        ctx.send(embed=embed)
-
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
     @log_command
     async def classic_search(self, ctx: commands.Context, filename: str):
