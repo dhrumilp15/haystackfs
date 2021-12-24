@@ -78,14 +78,13 @@ class Discordfs(commands.Cog):
             return await function(self, *args, **kwargs)
         return wrapper
 
-    @cog_ext.cog_slash(
-        name="help",
-        description="A help command",
-        options=[dm_option],
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
-    )
-    async def slash_help(self, ctx: SlashContext, dm: bool = False):
-        await ctx.defer(hidden=dm)
+    def build_help_embed(self) -> discord.Embed:
+        """
+        Build help embed.
+
+        Returns:
+            The help embed
+        """
         embed = discord.Embed(
             title=f'{self.bot.user.name}',
             color=discord.Color.teal()
@@ -109,7 +108,25 @@ class Discordfs(commands.Cog):
         embed.set_footer(
             text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
             icon_url=self.bot.user.avatar_url)
-        await ctx.send(embed=embed)
+        return embed
+
+    @cog_ext.cog_slash(
+        name="help",
+        description="A help command",
+        options=[dm_option],
+        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+    )
+    async def slash_help(self, ctx: SlashContext, dm: bool = False):
+        """
+        Responds to /help. Displays a help command with commands and search options.
+
+        Args:
+            ctx: The SlashContext from which the command was issued
+            dm: Whether to display the command only to the author
+        """
+        await ctx.defer(hidden=dm)
+        embed = self.build_help_embed()
+        await ctx.send(embed=embed, hidden=dm)
 
     @cog_ext.cog_slash(
         name="search",
@@ -204,6 +221,13 @@ class Discordfs(commands.Cog):
             await ctx.send(content=removed_files, hidden=True)
             return
         await ctx.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
+
+    @commands.command(name="help", alases=['h'])
+    @log_command
+    async def classic_help(self, ctx: commands.Context):
+        """Respond to help command."""
+        embed = self.build_help_embed()
+        ctx.send(embed=embed)
 
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
     @log_command
