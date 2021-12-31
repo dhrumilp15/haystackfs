@@ -398,7 +398,7 @@ class Discordfs(commands.Cog):
     async def on_command_error(self, ctx, e):
         """Command Error Handler."""
         if self.owner:
-            await self.owner.send(f"{type(e)}\n{e}")
+            await self.owner.send(f"{vars(ctx)}\n{type(e)}\n{e}")
 
     @tasks.loop(hours=24)
     async def clear_irrelevant_docs(self):
