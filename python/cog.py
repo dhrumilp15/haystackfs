@@ -223,13 +223,17 @@ class Discordfs(commands.Cog):
         # script does not leak the full server channel list every export. This mapping
         # is required so the export script can save files in directories named by the channels.
         needed_ids = set(f["channel_id"] for f in files)
-        channels = {
-            str(c.id): sanitize(c.name, str(c.id))
-            for c in ctx.guild.channels
-            if c.id in needed_ids
-        }
-
-        guild_name = sanitize(ctx.guild.name, "export")
+        if ctx.guild is None:
+            chan = ctx.channel
+            channels = {str(chan.id): sanitize(chan, str(chan.id))}
+            guild_name = sanitize(chan.name, "export")
+        else:
+            channels = {
+                str(c.id): sanitize(c.name, str(c.id))
+                for c in ctx.guild.channels
+                if c.id in needed_ids
+            }
+            guild_name = sanitize(ctx.guild.name, "export")
 
         # This is so that if one is running multiple exports in a server,
         # they don't get export(1).py etc.
