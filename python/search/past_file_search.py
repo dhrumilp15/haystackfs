@@ -1,16 +1,17 @@
 """Search for files purely in discord."""
 from .async_search_client import AsyncSearchClient
 import discord
-from typing import List, Dict
+from typing import List, Dict, Union
 from fuzzywuzzy import fuzz
 from utils import attachment_to_search_dict
 import datetime
+import json
 
 
 class PastFileSearch(AsyncSearchClient):
     """Search for files in discord with just discord."""
 
-    def __init__(self, thresh: int = 75):
+    def __init__(self, thresh: int = 75, indices_fp: str = "indices"):
         """
         Create a DiscordSearch object.
 
@@ -22,6 +23,7 @@ class PastFileSearch(AsyncSearchClient):
         self.banned_file_ids = set()
         self.thresh = thresh
         self.user = None
+        self.indices_fp = indices_fp
 
     def initialize(self, bot_user: str, *args, **kwargs) -> bool:
         """
@@ -32,6 +34,24 @@ class PastFileSearch(AsyncSearchClient):
         """
         self.user = bot_user
         return True
+
+    async def index(self, ctx: Union[discord.DMChannel, discord.Guild]):
+        if isinstance(ctx, discord.Guild):
+            channels = ctx.text_channels
+        else:
+            channels = [ctx]
+        name = ctx.name
+        chan_map = {}
+        for chan in channels:
+            messages = chan.history(limit=int(1e2))
+            async for message in messages:
+                if message.attachments:
+                    if chan.id in chan_map:
+                        chan_map[chan.id].extend([attachment_to_search_dict(message, f) for f in message.attachments])
+                    else:
+                        chan_map[chan.id] = [attachment_to_search_dict(message, f) for f in message.attachments]
+        with open(f"{name}.json", 'w') as f:
+            json.dump(chan_map, fp=f, indent=4)
 
     def match(self, message: discord.Message, **kwargs) -> List[discord.Attachment]:
         """
@@ -99,7 +119,9 @@ class PastFileSearch(AsyncSearchClient):
                          'jump_url': message.jump_url} for atch in matched])
         return files
 
-    async def search(self, onii_chan: discord.DMChannel or discord.Guild, bot_user=None, *args, **kwargs) -> List[Dict]:
+    async def search(
+        self, onii_chan: Union[discord.DMChannel, discord.Guild], bot_user=None, *args, **kwargs
+    ) -> List[Dict]:
         """
         Search all channels in a Guild or the provided channel.
 
@@ -122,6 +144,7 @@ class PastFileSearch(AsyncSearchClient):
             return await self.channel_search(onii_chan, *args, **kwargs)
         if isinstance(kwargs.get("channel"), discord.TextChannel):
             return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
+        await self.index(onii_chan)
         files = []
         for chan in onii_chan.text_channels:
             if chan.permissions_for(bot_user).read_message_history:
