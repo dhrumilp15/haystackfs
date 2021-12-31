@@ -10,7 +10,7 @@ import datetime
 class PastFileSearch(AsyncSearchClient):
     """Search for files in discord with just discord."""
 
-    def __init__(self, thresh: int = 85):
+    def __init__(self, thresh: int = 75):
         """
         Create a DiscordSearch object.
 
@@ -65,11 +65,11 @@ class PastFileSearch(AsyncSearchClient):
         if kwargs.get('filename'):
             filename = kwargs['filename']
             res = [atch for atch in res if fuzz.partial_ratio(
-                atch.filename.lower(), filename.lower()) > self.thresh]
+                atch.filename.lower(), filename.lower()) >= self.thresh]
         if kwargs.get('custom_filetype'):
             filetype = kwargs['custom_filetype']
             res = [atch for atch in res if fuzz.partial_ratio(
-                atch.filename.lower(), filetype.lower()) > self.thresh]
+                atch.filename.lower(), filetype.lower()) >= self.thresh]
         if kwargs.get("filetype"):
             res = [atch for atch in res if atch.content_type == kwargs["filetype"]]
         if kwargs.get("banned_ids"):

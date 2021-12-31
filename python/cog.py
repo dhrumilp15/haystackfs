@@ -9,6 +9,7 @@ from search.algolia_client import AlgoliaClient
 from mongo_client import MgClient
 from utils import attachment_to_search_dict, search_options, dm_option
 from bot_commands import fdelete, fremove, fsearch
+from export_template import generate_script
 from config import CONFIG
 import logging
 from discord_slash import SlashContext, cog_ext
@@ -20,7 +21,10 @@ import discord
 import datetime
 from dateutil import parser
 import glob
-from typing import List, Dict
+from typing import List, Dict, Tuple, Union
+import io
+import re
+import hashlib
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -128,6 +132,52 @@ class Discordfs(commands.Cog):
         embed = self.build_help_embed()
         await ctx.send(embed=embed, hidden=dm)
 
+    async def locate(
+        self, ctx: SlashContext, **kwargs
+    ) -> Tuple[Union[SlashContext, discord.member.Member, discord.user.ClientUser], List[Dict]]:
+        """
+        Common code between search and export; turn arguments into a search, and return the files.
+
+        Args:
+            ctx: The SlashContext from which the command originated
+            filename: A str of the filename to query for.
+            DM: A bool for whether to dm the author the results.
+
+        Returns a destination that has a .send method, and a list of files.
+        """
+        await ctx.defer(hidden=kwargs.get("dm", False))
+        try:
+            await self.db_client.log_command(**kwargs)
+        except:
+            pass
+
+        if kwargs.get("before"):
+            before = parser.parse(kwargs.get("before"))
+            # Long way to do it but I'm not sure how else to do this
+            before = datetime.datetime(*before.timetuple()[:3])
+            before += datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
+        if kwargs.get("after"):
+            after = parser.parse(kwargs.get("after"))
+            after = datetime.datetime(*after.timetuple()[:3])
+            after -= datetime.timedelta(microseconds=1)
+
+        if kwargs.get("channel") and ctx.guild is not None:
+            if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
+                await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
+                return ctx, []
+        files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
+        # TODO: Better Error Handling
+        if isinstance(files, str):
+            await ctx.send(content=files, hidden=True)
+            return ctx, []
+
+        recipient = ctx
+        if kwargs.get("dm"):
+            recipient = ctx.author
+            await ctx.send("DM'ing your files...", hidden=True)
+
+        return (recipient, files)
+
     @cog_ext.cog_slash(
         name="search",
         description="Search for files.",
@@ -143,40 +193,53 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
         """
-        await ctx.defer(hidden=kwargs.get("dm", False))
-        try:
-            await self.db_client.log_command(**kwargs)
-        except:
-            pass
+        recipient, files = await self.locate(ctx, **kwargs)
+        if files:
+            await self.send_files_as_message(recipient, files)
 
-        # if not kwargs:
-        #     await ctx.send(f"You must specify a parameter to search on!", hidden=False)
-        #     return
+    @cog_ext.cog_slash(
+        name="export",
+        description="Get a Python export script to download the files returned in a search to your computer.",
+        options=search_options,
+        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+    )
+    async def slash_export(self, ctx: SlashContext, **kwargs):
+        """
+        Responds to `/export`. Tries get a download script for all files related to a query from ElasticSearch.
 
-        if kwargs.get("before"):
-            before = parser.parse(kwargs.get("before"))
-            # Long way to do it but I'm not sure how else to do this
-            before = datetime.datetime(*before.timetuple()[:3])
-            before += datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-        if kwargs.get("after"):
-            after = parser.parse(kwargs.get("after"))
-            after = datetime.datetime(*after.timetuple()[:3])
-            after -= datetime.timedelta(microseconds=1)
-
-        if kwargs.get("channel") and ctx.guild is not None:
-            if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
-                await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
-                return
-        files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
-        # TODO: Better Error Handling
-        if isinstance(files, str):
-            await ctx.send(content=files, hidden=True)
+        Args:
+            ctx: The SlashContext from which the command originated.
+            filename: A str of the filename to query for, if any.
+            DM: A bool for whether to dm the author the results.
+        """
+        recipient, files = await self.locate(ctx, **kwargs)
+        if not files:
             return
-        author = ctx
-        if kwargs.get("dm"):
-            author = ctx.author
-            await ctx.send("DM'ing your files...", hidden=True)
-        await self.send_files_as_message(author, files)
+
+        # So file names are maximally compatible.
+        def sanitize(s, default): return re.sub(r"[^A-Za-z0-9'\-\_ ]", "", s).rstrip() or default
+
+        # Restrict to channels that the search returns files for. This is so that the
+        # script does not leak the full server channel list every export. This mapping
+        # is required so the export script can save files in directories named by the channels.
+        needed_ids = set(f["channel_id"] for f in files)
+        channels = {
+            str(c.id): sanitize(c.name, str(c.id))
+            for c in ctx.guild.channels
+            if c.id in needed_ids
+        }
+
+        guild_name = sanitize(ctx.guild.name, "export")
+
+        # This is so that if one is running multiple exports in a server,
+        # they don't get export(1).py etc.
+        unique_suffix = hashlib.sha256(bytes(str(sorted(f["url"] for f in files)), "utf-8")).hexdigest()[:5]
+        filename = f"export_{guild_name}_{unique_suffix}.py"
+        with io.StringIO(generate_script(guild_name, files, channels)) as export_script:
+            await recipient.send(
+                f"Found {len(files)} file(s). Run this script to download them.",
+                file=discord.File(export_script, filename=filename)
+            )
 
     @cog_ext.cog_slash(
         name="delete",
