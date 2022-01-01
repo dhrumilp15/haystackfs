@@ -73,9 +73,9 @@ class PastFileSearch(AsyncSearchClient):
             chan_map[str(channel.id)] = await self.channel_index(channel)
         else:
             for chan in channels:
-                chan_map[str(chan.id)] = await self.channel_index(chan)
+                chan_index = await self.channel_index(chan)
+                chan_map[str(chan.id)] = chan_index
         with open(f'{self.indices_fp}/{ctx.name}.json', 'w') as f:
-            # quick way to handle storing datetimes...
             json.dump(chan_map, fp=f, indent=4)
         return chan_map
 
@@ -187,12 +187,11 @@ class PastFileSearch(AsyncSearchClient):
         with open(filename, 'r') as f:
             chan_map = json.load(f)
 
-        if message.guild is not None:
-            key = str(message.channel.id)
-            if key in chan_map:
-                chan_map[key].append(attachment_to_search_dict(message, file))
-            else:
-                chan_map[key] = [attachment_to_search_dict(message, file)]
+        key = str(message.channel.id)
+        if key in chan_map:
+            chan_map[key].append(attachment_to_search_dict(message, file))
+        else:
+            chan_map[key] = [attachment_to_search_dict(message, file)]
         with open(filename, 'w') as f:
             json.dump(chan_map, fp=f, indent=4)
 
