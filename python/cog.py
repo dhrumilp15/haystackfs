@@ -136,7 +136,7 @@ class Discordfs(commands.Cog):
         self, ctx: SlashContext, **kwargs
     ) -> Tuple[Union[SlashContext, discord.member.Member, discord.user.ClientUser], List[Dict]]:
         """
-        Common code between search and export; turn arguments into a search, and return the files.
+        Turn arguments into a search and return the files.
 
         Args:
             ctx: The SlashContext from which the command originated
@@ -452,7 +452,7 @@ class Discordfs(commands.Cog):
         # TODO: Display all of the files in the embed if file count <= 5
         if len(files) <= 5:
             buttons = [create_button(style=ButtonStyle.URL,
-                                     label=f['file_name'],
+                                     label=f['filename'],
                                      url=f['jump_url']) for f in files]
             action_row = create_actionrow(*buttons)
         else:
@@ -462,7 +462,7 @@ class Discordfs(commands.Cog):
                 reduced_jump_url = file['jump_url'][jump_url_length:]
                 reduced_media_url = '/'.join(file['url'].split('/')[-2:])
                 option = create_select_option(
-                    label=file['file_name'],
+                    label=file['filename'],
                     value=','.join([reduced_jump_url, reduced_media_url])
                 )
                 options.append(option)
@@ -479,7 +479,7 @@ class Discordfs(commands.Cog):
         embed.set_footer(
             text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
             icon_url=self.bot.user.avatar_url)
-        filename = files[0].get('file_name')
+        filename = files[0].get('filename')
         mediaUrl = files[0].get('jump_url')
         if not mediaUrl:
             file_id = files[0]['objectID']
@@ -488,7 +488,7 @@ class Discordfs(commands.Cog):
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
         if 'image' in files[0]['filetype']:
             embed.set_image(url=files[0]['url'])
-        await ctx.send(f"Found {files[0]['file_name']} {'and more...' if len(files) > 1 else ''}",
+        await ctx.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
                        embed=embed, components=[action_row])
 
 

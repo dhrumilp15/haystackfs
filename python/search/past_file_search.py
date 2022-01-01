@@ -6,6 +6,8 @@ from fuzzywuzzy import fuzz
 from utils import attachment_to_search_dict
 import datetime
 import json
+import os
+from pathlib import Path
 
 
 class PastFileSearch(AsyncSearchClient):
@@ -24,8 +26,9 @@ class PastFileSearch(AsyncSearchClient):
         self.thresh = thresh
         self.user = None
         self.indices_fp = indices_fp
+        Path(indices_fp).mkdir(exist_ok=True)
 
-    def initialize(self, bot_user: str, *args, **kwargs) -> bool:
+    def initialize(self, bot_user: str, *args, **query) -> bool:
         """
         Initialize past file search.
 
@@ -35,68 +38,91 @@ class PastFileSearch(AsyncSearchClient):
         self.user = bot_user
         return True
 
-    async def index(self, ctx: Union[discord.DMChannel, discord.Guild]):
+    async def channel_index(self, channel: discord.TextChannel) -> List[Dict]:
+        messages = channel.history(limit=None)
+        chan_messages = []
+        async for message in messages:
+            if message.attachments:
+                chan_messages.extend([attachment_to_search_dict(message, f) for f in message.attachments])
+        return chan_messages
+
+    async def build_index(self, ctx: Union[discord.DMChannel, discord.Guild], channel: discord.TextChannel = None) -> Dict:
+        """
+        Build an index of files from a server/channel.
+
+        Args:
+            ctx: The DM Channel or Guild that is being searched
+            channel: An optional channel to search through
+
+        Returns:
+            An index of files in a server or channel
+        """
         if isinstance(ctx, discord.Guild):
             channels = ctx.text_channels
         else:
             channels = [ctx]
-        name = ctx.name
         chan_map = {}
-        for chan in channels:
-            messages = chan.history(limit=int(1e2))
-            async for message in messages:
-                if message.attachments:
-                    if chan.id in chan_map:
-                        chan_map[chan.id].extend([attachment_to_search_dict(message, f) for f in message.attachments])
-                    else:
-                        chan_map[chan.id] = [attachment_to_search_dict(message, f) for f in message.attachments]
-        with open(f"{name}.json", 'w') as f:
+        if os.path.exists(f"{self.indices_fp}/{ctx.name}.json"):
+            with open(f'{self.indices_fp}/{ctx.name}.json', 'r') as f:
+                chan_map = json.load(f)
+                if channel is None:
+                    return chan_map
+                if channel in chan_map:
+                    return chan_map
+        if channel is not None:
+            chan_map[channel.id] = await self.channel_index(channel)
+        else:
+            for chan in channels:
+                chan_map[chan.id] = await self.channel_index(chan)
+        with open(f'{self.indices_fp}/{ctx.name}.json', 'w') as f:
+            # quick way to handle storing datetimes...
             json.dump(chan_map, fp=f, indent=4)
+        return chan_map
 
-    def match(self, message: discord.Message, **kwargs) -> List[discord.Attachment]:
+    def match(self, message: discord.Message, **query) -> List[discord.Attachment]:
         """
         Match the message against possible arguments.
 
         Args:
             message: The message to test
-            kwargs: kwargs of args to match
+            query: query of args to match
 
         Returns:
             A list of discord.Attachments that match the query.
         """
         if not message.attachments or message.author == self.user:
             return []
-        if kwargs.get("content"):
-            if fuzz.partial_ratio(kwargs['content'].lower(), message.content.lower()) < self.thresh:
+        if query.get("content"):
+            if fuzz.partial_ratio(query['content'].lower(), message.content.lower()) < self.thresh:
                 return []
-        if kwargs.get("after"):
-            if message.created_at < kwargs["after"]:
+        if query.get("after"):
+            if message.created_at < query["after"]:
                 return []
-        if kwargs.get("before"):
-            if message.created_at > kwargs["before"]:
+        if query.get("before"):
+            if message.created_at > query["before"]:
                 return []
-        if kwargs.get("author"):
-            if message.author != kwargs["author"]:
+        if query.get("author"):
+            if message.author != query["author"]:
                 return []
-        if kwargs.get("channel"):
-            if message.channel != kwargs["channel"]:
+        if query.get("channel"):
+            if message.channel != query["channel"]:
                 return []
         res = message.attachments
-        if kwargs.get('filename'):
-            filename = kwargs['filename']
+        if query.get('filename'):
+            filename = query['filename']
             res = [atch for atch in res if fuzz.partial_ratio(
                 atch.filename.lower(), filename.lower()) >= self.thresh]
-        if kwargs.get('custom_filetype'):
-            filetype = kwargs['custom_filetype']
+        if query.get('custom_filetype'):
+            filetype = query['custom_filetype']
             res = [atch for atch in res if fuzz.partial_ratio(
                 atch.filename.lower(), filetype.lower()) >= self.thresh]
-        if kwargs.get("filetype"):
-            res = [atch for atch in res if atch.content_type == kwargs["filetype"]]
-        if kwargs.get("banned_ids"):
-            res = [atch for atch in res if atch.id not in kwargs["banned_ids"]]
+        if query.get("filetype"):
+            res = [atch for atch in res if atch.content_type == query["filetype"]]
+        if query.get("banned_ids"):
+            res = [atch for atch in res if atch.id not in query["banned_ids"]]
         return res
 
-    async def channel_search(self, onii_chan, *args, **kwargs) -> List[Dict]:
+    async def channel_search(self, onii_chan, *args, **query) -> List[Dict]:
         """
         Iterate through previous messages in a discord channel for files.
 
@@ -112,15 +138,69 @@ class PastFileSearch(AsyncSearchClient):
             return ""
 
         files = []
-        matched_messages = onii_chan.history(limit=int(1e9), before=kwargs.get('before'), after=kwargs.get('after'))
+        matched_messages = onii_chan.history(limit=int(1e9), before=query.get('before'), after=query.get('after'))
         async for message in matched_messages:
-            matched = self.match(message, **kwargs)
-            files.extend([{**attachment_to_search_dict(message, atch), 'url': atch.url,
-                         'jump_url': message.jump_url} for atch in matched])
+            matched = self.match(message, **query)
+            files.extend([attachment_to_search_dict(message, atch) for atch in matched])
         return files
 
+    def search_dict_match(self, search_dict: Dict, **query: Dict) -> bool:
+        """
+        Match the query against a file's search dict.
+
+        Args:
+            search_dict: The file to match
+            query: Query Arguments
+
+        Returns:
+            A list of discord.Attachments that match the query.
+        """
+        if query.get("content"):
+            if fuzz.partial_ratio(query['content'].lower(), search_dict.content.lower()) < self.thresh:
+                return False
+        if query.get("after"):
+            if search_dict['created_at'] < query["after"]:
+                return False
+        if query.get("before"):
+            if search_dict['created_at'] > query["before"]:
+                return False
+        if query.get("author"):
+            if search_dict['author_id'] != query["author"].id:
+                return False
+        if query.get("channel"):
+            if search_dict['channel_id'] != query["channel"].id:
+                return False
+        if query.get('filename'):
+            if fuzz.partial_ratio(query['filename'].lower(), search_dict['filename']) < self.thresh:
+                return False
+        if query.get('custom_filetype'):
+            if fuzz.partial_ratio(query['custom_filetype'].lower(), search_dict['filetype']) < self.thresh:
+                return False
+        if query.get("filetype"):
+            if search_dict['filetype'] != query['filetype']:
+                return False
+        if query.get("banned_ids"):
+            if search_dict['objectID'] in query['banned_ids']:
+                return False
+        return True
+
+    async def chan_search(self, chan_index: Dict, **query) -> List[Dict]:
+        """
+        Search a channel index for a query.
+
+        Args:
+            chan_index: The index of the channel
+            query: The query to use to search the channel
+
+        Returns:
+            A list of dicts of files
+        """
+        if self.user is None:
+            return []
+        return [file for file in chan_index if self.search_dict_match(file, **query)]
+
     async def search(
-        self, onii_chan: Union[discord.DMChannel, discord.Guild], bot_user=None, *args, **kwargs
+        self, onii_chan: Union[discord.DMChannel, discord.Guild], bot_user=None, *args, **query
     ) -> List[Dict]:
         """
         Search all channels in a Guild or the provided channel.
@@ -135,20 +215,21 @@ class PastFileSearch(AsyncSearchClient):
         if self.user is None:
             return []
 
-        if kwargs.get('banned_ids'):
-            kwargs['banned_ids'].update(self.banned_file_ids)
+        if query.get('banned_ids'):
+            query['banned_ids'].update(self.banned_file_ids)
         else:
-            kwargs['banned_ids'] = self.banned_file_ids
+            query['banned_ids'] = self.banned_file_ids
 
         if isinstance(onii_chan, discord.DMChannel):
-            return await self.channel_search(onii_chan, *args, **kwargs)
-        if isinstance(kwargs.get("channel"), discord.TextChannel):
-            return await self.channel_search(kwargs.get("channel"), *args, **kwargs)
-        await self.index(onii_chan)
+            return await self.channel_search(onii_chan, *args, **query)
+        if isinstance(query.get("channel"), discord.TextChannel):
+            if query['channel'].permission_for(bot_user).read_message_history:
+                return await self.channel_search(query.get("channel"), *args, **query)
+        chan_map = await self.build_index(onii_chan)
         files = []
         for chan in onii_chan.text_channels:
             if chan.permissions_for(bot_user).read_message_history:
-                chan_files = await self.channel_search(chan, *args, **kwargs)
+                chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
                 files.extend(chan_files)
         return files
 

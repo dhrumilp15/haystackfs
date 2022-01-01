@@ -133,7 +133,7 @@ class ElasticSearchClient(AsyncSearchClient):
                     "must": [
                         {
                             "match": {
-                                "file_name": {
+                                "filename": {
                                     "query": filename,
                                     "fuzziness": "AUTO",
                                 }
