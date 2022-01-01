@@ -357,8 +357,7 @@ class Discordfs(commands.Cog):
             serv = message.guild
         for file in message.attachments:
             message.content = self.sme.encrypt(message.content)
-            meta_dict = attachment_to_search_dict(message, file)
-            await self.search_client.create_doc(meta_dict, serv.id, message.author.name + "#" + message.author.discriminator)
+            await self.search_client.create_doc(file, message)
             await self.db_client.add_file(message)
         await self.bot.process_commands(message)
 

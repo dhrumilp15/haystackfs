@@ -70,10 +70,10 @@ class PastFileSearch(AsyncSearchClient):
                 if channel in chan_map:
                     return chan_map
         if channel is not None:
-            chan_map[channel.id] = await self.channel_index(channel)
+            chan_map[str(channel.id)] = await self.channel_index(channel)
         else:
             for chan in channels:
-                chan_map[chan.id] = await self.channel_index(chan)
+                chan_map[str(chan.id)] = await self.channel_index(chan)
         with open(f'{self.indices_fp}/{ctx.name}.json', 'w') as f:
             # quick way to handle storing datetimes...
             json.dump(chan_map, fp=f, indent=4)
@@ -233,9 +233,30 @@ class PastFileSearch(AsyncSearchClient):
                 files.extend(chan_files)
         return files
 
-    async def create_doc(self, *args, **kwargs):
-        """We don't maintain search indices in this class, so this is not needed."""
-        return
+    async def create_doc(self, file: discord.File, message: discord.Message, *args, **kwargs):
+        """
+        Update the search index for the corresponding server/channel with the new file.
+
+        Args:
+            file: The file to save
+            message: The message in which the file is sent
+        """
+        if message.guild is not None:
+            source = message.guild
+        else:
+            source = message.channel
+        filename = os.path.join(self.indices_fp, f'{source.name}.json')
+        with open(filename, 'r') as f:
+            chan_map = json.load(f)
+
+        if message.guild is not None:
+            key = str(message.channel.id)
+            if key in chan_map:
+                chan_map[key].append(attachment_to_search_dict(message, file))
+            else:
+                chan_map[key] = [attachment_to_search_dict(message, file)]
+        with open(filename, 'w') as f:
+            json.dump(chan_map, fp=f, indent=4)
 
     async def clear(self, *args, **kwargs):
         """We don't maintain search indices in this class, so this is not needed."""

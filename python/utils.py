@@ -177,6 +177,7 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
         "content": message.content,
         "filename": file.filename,
         "filetype": file.content_type,
+        "channel_id": message.channel.id,
         "message_id": message.id,
         "url": file.url,
         "jump_url": message.jump_url,
