@@ -128,7 +128,7 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
     """
     for file in files:
         url = file.get('url')
-        filename = file.get('file_name')
+        filename = file.get('filename')
         if not url:
             file_id = file['objectID']
             try:
@@ -137,7 +137,7 @@ async def download(files: List[Dict], mg_client: MgClient) -> List[discord.File]
                     print("Empty response from Mongo")
                     continue
                 url = res['url']
-                filename = res['file_name']
+                filename = res['filename']
             except BaseException as e:
                 print(e)
         response = requests.get(url, stream=True)
@@ -175,10 +175,13 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
         "objectID": file.id,
         "author_id": message.author.id,
         "content": message.content,
-        "file_name": file.filename,
+        "filename": file.filename,
         "filetype": file.content_type,
-        "message_id": message.id,
         "channel_id": message.channel.id,
+        "message_id": message.id,
+        "url": file.url,
+        "jump_url": message.jump_url,
+        "created_at": message.created_at.isoformat()
     }
 
 

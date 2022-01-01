@@ -43,7 +43,7 @@ class MgClient:
         """
         if not self.db:
             return dict()
-        res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "file_name": 1})
+        res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "filename": 1})
         return res
 
     async def log_command(self, command, *args, **kwargs) -> bool:

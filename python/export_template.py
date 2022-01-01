@@ -34,9 +34,9 @@ if not os.path.exists(root_path):
 
 for f in files:
     channel = channels[str(f["channel_id"])]
-    path = os.path.join(root_path, channel, f["file_name"])
+    path = os.path.join(root_path, channel, f["filename"])
     if os.path.exists(path):
-        print(f"Skipping {f['file_name']} (already downloaded)")
+        print(f"Skipping {f['filename']} (already downloaded)")
         continue
     print(f"Fetching {f['url']}")
     finished = False
