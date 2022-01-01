@@ -3,7 +3,7 @@ from .async_search_client import AsyncSearchClient
 import discord
 from typing import List, Dict, Union
 from fuzzywuzzy import fuzz
-from utils import attachment_to_search_dict
+from utils import attachment_to_mongo_dict, attachment_to_search_dict
 import datetime
 import json
 import os
@@ -78,71 +78,6 @@ class PastFileSearch(AsyncSearchClient):
             # quick way to handle storing datetimes...
             json.dump(chan_map, fp=f, indent=4)
         return chan_map
-
-    def match(self, message: discord.Message, **query) -> List[discord.Attachment]:
-        """
-        Match the message against possible arguments.
-
-        Args:
-            message: The message to test
-            query: query of args to match
-
-        Returns:
-            A list of discord.Attachments that match the query.
-        """
-        if not message.attachments or message.author == self.user:
-            return []
-        if query.get("content"):
-            if fuzz.partial_ratio(query['content'].lower(), message.content.lower()) < self.thresh:
-                return []
-        if query.get("after"):
-            if message.created_at < query["after"]:
-                return []
-        if query.get("before"):
-            if message.created_at > query["before"]:
-                return []
-        if query.get("author"):
-            if message.author != query["author"]:
-                return []
-        if query.get("channel"):
-            if message.channel != query["channel"]:
-                return []
-        res = message.attachments
-        if query.get('filename'):
-            filename = query['filename']
-            res = [atch for atch in res if fuzz.partial_ratio(
-                atch.filename.lower(), filename.lower()) >= self.thresh]
-        if query.get('custom_filetype'):
-            filetype = query['custom_filetype']
-            res = [atch for atch in res if fuzz.partial_ratio(
-                atch.filename.lower(), filetype.lower()) >= self.thresh]
-        if query.get("filetype"):
-            res = [atch for atch in res if atch.content_type == query["filetype"]]
-        if query.get("banned_ids"):
-            res = [atch for atch in res if atch.id not in query["banned_ids"]]
-        return res
-
-    async def channel_search(self, onii_chan, *args, **query) -> List[Dict]:
-        """
-        Iterate through previous messages in a discord channel for files.
-
-        Args:
-            filename: The query
-            onii_chan: The channel to search in
-            kawrgs: Search paramaters
-
-        Returns:
-            A list of dicts of files.
-        """
-        if self.user is None:
-            return ""
-
-        files = []
-        matched_messages = onii_chan.history(limit=int(1e9), before=query.get('before'), after=query.get('after'))
-        async for message in matched_messages:
-            matched = self.match(message, **query)
-            files.extend([attachment_to_search_dict(message, atch) for atch in matched])
-        return files
 
     def search_dict_match(self, search_dict: Dict, **query: Dict) -> bool:
         """
@@ -246,6 +181,9 @@ class PastFileSearch(AsyncSearchClient):
         else:
             source = message.channel
         filename = os.path.join(self.indices_fp, f'{source.name}.json')
+        # only maintain indices for servers that run commands
+        if not os.path.exists(filename):
+            return
         with open(filename, 'r') as f:
             chan_map = json.load(f)
 
