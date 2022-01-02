@@ -106,10 +106,12 @@ class PastFileSearch(AsyncSearchClient):
             if search_dict['channel_id'] != query["channel"].id:
                 return False
         if query.get('filename'):
-            if fuzz.partial_ratio(query['filename'].lower(), search_dict['filename']) < self.thresh:
+            if fuzz.partial_ratio(query['filename'].lower(),
+                                  search_dict['filename']) < self.thresh:
                 return False
         if query.get('custom_filetype'):
-            if fuzz.partial_ratio(query['custom_filetype'].lower(), search_dict['filetype']) < self.thresh:
+            if fuzz.partial_ratio(query['custom_filetype'].lower(),
+                                  search_dict['filetype'].lower()) < self.thresh:
                 return False
         if query.get("filetype"):
             if search_dict['filetype'] != query['filetype']:

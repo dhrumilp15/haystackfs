@@ -171,12 +171,15 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
     Returns:
         A dict that contains metadata about the attachment.
     """
+    filetype = file.content_type
+    if filetype is None:
+        filetype = file.filename[file.filename.rindex('.') + 1:]
     return {
         "objectID": file.id,
         "author_id": message.author.id,
         "content": message.content,
         "filename": file.filename,
-        "filetype": file.content_type,
+        "filetype": filetype,
         "channel_id": message.channel.id,
         "message_id": message.id,
         "url": file.url,

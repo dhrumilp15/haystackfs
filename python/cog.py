@@ -424,16 +424,16 @@ class Discordfs(commands.Cog):
         if ctx.component_type == 3:
             embed = ctx.origin_message.embeds[0]
             name = ""
-            jump_url = ctx.selected_options[0]
+            payload = ctx.selected_options[0]
             for opt in ctx.component['options']:
-                if opt['value'] == jump_url:
+                if opt['value'] == payload:
                     name = opt['label']
                     break
-            make_jump, media_url = jump_url.split(',')
-            mj = make_jump.split('/')
-            make_jump = f"https://discord.com/channels/{make_jump}"
-            media_url = f"https://cdn.discordapp.com/attachments/{mj[1]}/{media_url}"
-            embed.set_field_at(index=0, name=name, value=make_jump)
+            channel_id, message_id, file_id = payload.split(',')
+            if ctx.guild is not None:
+                jump_url = f"https://discord.com/channels/{ctx.guild.id}/{channel_id}/{message_id}"
+                media_url = f"https://cdn.discordapp.com/attachments/{channel_id}/{file_id}/{name}"
+            embed.set_field_at(index=0, name=name, value=jump_url)
             embed.set_image(url=media_url)
             await ctx.edit_origin(embed=embed)
 
@@ -458,11 +458,9 @@ class Discordfs(commands.Cog):
             # TODO: Sort the files in the select
             options = []
             for file in files:
-                reduced_jump_url = file['jump_url'][jump_url_length:]
-                reduced_media_url = '/'.join(file['url'].split('/')[-2:])
                 option = create_select_option(
                     label=file['filename'],
-                    value=','.join([reduced_jump_url, reduced_media_url])
+                    value=','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
                 )
                 options.append(option)
             select = create_select(
