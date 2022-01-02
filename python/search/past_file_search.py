@@ -107,13 +107,16 @@ class PastFileSearch(AsyncSearchClient):
                 return False
         if query.get('filename'):
             if fuzz.partial_ratio(query['filename'].lower(),
-                                  search_dict['filename']) < self.thresh:
+                                  search_dict['filename'].lower()) < self.thresh:
                 return False
         if query.get('custom_filetype'):
             if fuzz.partial_ratio(query['custom_filetype'].lower(),
                                   search_dict['filetype'].lower()) < self.thresh:
                 return False
         if query.get("filetype"):
+            if query['filetype'] == 'image':
+                if 'image' not in search_dict['content_type']:
+                    return False
             if search_dict['filetype'] != query['filetype']:
                 return False
         if query.get("banned_ids"):
