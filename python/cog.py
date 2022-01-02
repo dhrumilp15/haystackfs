@@ -4,10 +4,8 @@ from functools import reduce, wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
-from search.searcher import Searcher
-from search.algolia_client import AlgoliaClient
 from mongo_client import MgClient
-from utils import attachment_to_search_dict, search_options, dm_option
+from utils import search_options, dm_option
 from bot_commands import fdelete, fremove, fsearch
 from export_template import generate_script
 from config import CONFIG
@@ -447,7 +445,6 @@ class Discordfs(commands.Cog):
             mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
         files = files[:25]
-        jump_url_length = len("https://discord.com/channels/")
         # TODO: Display all of the files in the embed if file count <= 5
         if len(files) <= 5:
             buttons = [create_button(style=ButtonStyle.URL,
@@ -483,7 +480,7 @@ class Discordfs(commands.Cog):
             res = await self.db_client.get_file(file_id)
             mediaUrl = res['url']
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
-        if 'image' in files[0]['filetype']:
+        if 'image' in files[0]['content_type']:
             embed.set_image(url=files[0]['url'])
         await ctx.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
                        embed=embed, components=[action_row])
