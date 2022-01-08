@@ -442,7 +442,6 @@ class Discordfs(commands.Cog):
         Args:
             ctx: The originating context.
             files: The files to send to the context.
-            mg_client: The Mongodb client. Used only when 'jump_url' doesn't exist.
         """
         files = files[:25]
         # TODO: Display all of the files in the embed if file count <= 5
