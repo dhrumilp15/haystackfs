@@ -39,6 +39,15 @@ class PastFileSearch(AsyncSearchClient):
         return True
 
     async def channel_index(self, channel: discord.TextChannel) -> List[Dict]:
+        """
+        Index a channel's files.
+
+        Args:
+            channel: The channel to index
+
+        Returns:
+            A list of dicts of file metadata
+        """
         messages = channel.history(limit=None)
         chan_messages = []
         async for message in messages:
@@ -91,7 +100,7 @@ class PastFileSearch(AsyncSearchClient):
             A list of discord.Attachments that match the query.
         """
         if query.get("content"):
-            if fuzz.partial_ratio(query['content'].lower(), search_dict.content.lower()) < self.thresh:
+            if fuzz.partial_ratio(query['content'].lower(), search_dict['content'].lower()) < self.thresh:
                 return False
         if query.get("after"):
             if search_dict['created_at'] < query["after"]:
@@ -114,11 +123,18 @@ class PastFileSearch(AsyncSearchClient):
                                   search_dict['filetype'].lower()) < self.thresh:
                 return False
         if query.get("filetype"):
+            filetype = search_dict['content_type']
+            if filetype is None:
+                filetype = search_dict['filetype']
             if query['filetype'] == 'image':
-                if 'image' not in search_dict['content_type']:
+                if 'image' not in filetype:
                     return False
-            if search_dict['filetype'] != query['filetype']:
-                return False
+            elif query['filetype'] == 'audio':
+                if 'audio' not in filetype:
+                    return False
+            else:
+                if query['filetype'] != filetype:
+                    return False
         if query.get("banned_ids"):
             if search_dict['objectID'] in query['banned_ids']:
                 return False
