@@ -481,8 +481,9 @@ class Discordfs(commands.Cog):
             res = await self.db_client.get_file(file_id)
             mediaUrl = res['url']
         embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
-        if 'image' in files[0]['content_type']:
-            embed.set_image(url=files[0]['url'])
+        if files[0].get('content_type', None):
+            if 'image' in files[0]['content_type']:
+                embed.set_image(url=files[0]['url'])
         await ctx.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
                        embed=embed, components=[action_row])
 

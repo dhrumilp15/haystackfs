@@ -190,7 +190,9 @@ class PastFileSearch(AsyncSearchClient):
                 if chan.permissions_for(bot_user).read_message_history:
                     chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
                     files.extend(chan_files)
-        return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
+        if query.get('filename', None):
+            return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
+        return files
 
     async def create_doc(self, file: discord.File, message: discord.Message, *args, **kwargs):
         """
