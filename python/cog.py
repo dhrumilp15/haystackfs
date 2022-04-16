@@ -154,10 +154,12 @@ class Discordfs(commands.Cog):
             # Long way to do it but I'm not sure how else to do this
             before = datetime.datetime(*before.timetuple()[:3])
             before += datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
+            kwargs['before'] = before
         if kwargs.get("after"):
             after = parser.parse(kwargs.get("after"))
             after = datetime.datetime(*after.timetuple()[:3])
             after -= datetime.timedelta(microseconds=1)
+            kwargs['after'] = after
 
         if kwargs.get("channel") and ctx.guild is not None:
             if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:

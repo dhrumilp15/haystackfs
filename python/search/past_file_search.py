@@ -8,6 +8,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+from dateutil import parser
 
 
 class PastFileSearch(AsyncSearchClient):
@@ -102,11 +103,12 @@ class PastFileSearch(AsyncSearchClient):
         if query.get("content"):
             if fuzz.partial_ratio(query['content'].lower(), search_dict['content'].lower()) < self.thresh:
                 return False
+        created_at = parser.parse(search_dict['created_at'])
         if query.get("after"):
-            if search_dict['created_at'] < query["after"]:
+            if created_at < query["after"]:
                 return False
         if query.get("before"):
-            if search_dict['created_at'] > query["before"]:
+            if created_at > query["before"]:
                 return False
         if query.get("author"):
             if search_dict['author_id'] != query["author"].id:
@@ -176,17 +178,19 @@ class PastFileSearch(AsyncSearchClient):
         else:
             query['banned_ids'] = self.banned_file_ids
 
-        if isinstance(onii_chan, discord.DMChannel):
-            return await self.channel_search(onii_chan, *args, **query)
-        if isinstance(query.get("channel"), discord.TextChannel):
-            if query['channel'].permission_for(bot_user).read_message_history:
-                return await self.channel_search(query.get("channel"), *args, **query)
         chan_map = await self.build_index(onii_chan)
+        if isinstance(onii_chan, discord.DMChannel):
+            return await self.chan_search(chan_map[str(onii_chan.id)], *args, **query)
+        if isinstance(query.get("channel"), discord.TextChannel):
+            if query['channel'].permissions_for(bot_user).read_message_history:
+                files = await self.chan_search(chan_map[str(query['channel'].id)], *args, **query)
+                return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
         files = []
         for chan in onii_chan.text_channels:
             if chan.permissions_for(bot_user).read_message_history:
                 chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
                 files.extend(chan_files)
+        files = sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
         return files
 
     async def create_doc(self, file: discord.File, message: discord.Message, *args, **kwargs):
