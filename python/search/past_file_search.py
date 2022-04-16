@@ -179,19 +179,18 @@ class PastFileSearch(AsyncSearchClient):
             query['banned_ids'] = self.banned_file_ids
 
         chan_map = await self.build_index(onii_chan)
+        files = []
         if isinstance(onii_chan, discord.DMChannel):
-            return await self.chan_search(chan_map[str(onii_chan.id)], *args, **query)
-        if isinstance(query.get("channel"), discord.TextChannel):
+            files = await self.chan_search(chan_map[str(onii_chan.id)], *args, **query)
+        elif isinstance(query.get("channel"), discord.TextChannel):
             if query['channel'].permissions_for(bot_user).read_message_history:
                 files = await self.chan_search(chan_map[str(query['channel'].id)], *args, **query)
-                return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
-        files = []
-        for chan in onii_chan.text_channels:
-            if chan.permissions_for(bot_user).read_message_history:
-                chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
-                files.extend(chan_files)
-        files = sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
-        return files
+        else:
+            for chan in onii_chan.text_channels:
+                if chan.permissions_for(bot_user).read_message_history:
+                    chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
+                    files.extend(chan_files)
+        return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
 
     async def create_doc(self, file: discord.File, message: discord.Message, *args, **kwargs):
         """
