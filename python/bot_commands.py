@@ -125,12 +125,13 @@ async def fsearch(ctx: SlashContext or commands.Context,
         bot_user = ctx.guild.me
 
     files = await search_client.search(
+        ctx,
         onii_chan,
         bot_user=bot_user,
         **kwargs
     )
     if not files:
-        return f"I couldn't find any files related to your query"
+        return f"I couldn't find any files related to your query. I may not have the `read_message_history` permission for some channels."
 
     manageable_files = filter_messages_with_permissions(
         author=ctx.author,
@@ -139,5 +140,5 @@ async def fsearch(ctx: SlashContext or commands.Context,
         bot=bot
     )
     if not manageable_files:
-        return f"I couldn't find any files that you can access"
+        return f"I couldn't find any files that you can access."
     return manageable_files

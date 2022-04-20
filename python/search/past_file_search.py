@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 from dateutil import parser
+import datetime
+import asyncio
 
 
 class PastFileSearch(AsyncSearchClient):
@@ -27,6 +29,7 @@ class PastFileSearch(AsyncSearchClient):
         self.thresh = thresh
         self.user = None
         self.indices_fp = indices_fp
+        self.index_jobs = []
         Path(indices_fp).mkdir(exist_ok=True)
 
     def initialize(self, bot_user: str, *args, **query) -> bool:
@@ -38,7 +41,7 @@ class PastFileSearch(AsyncSearchClient):
         """
         self.user = bot_user
         return True
-
+    
     async def channel_index(self, channel: discord.TextChannel) -> List[Dict]:
         """
         Index a channel's files.
@@ -56,7 +59,7 @@ class PastFileSearch(AsyncSearchClient):
                 chan_messages.extend([attachment_to_search_dict(message, f) for f in message.attachments])
         return chan_messages
 
-    async def build_index(self, ctx: Union[discord.DMChannel, discord.Guild], channel: discord.TextChannel = None) -> Dict:
+    async def build_index(self, ctx, source: Union[discord.DMChannel, discord.Guild], channel: discord.TextChannel = None) -> Dict:
         """
         Build an index of files from a server/channel.
 
@@ -67,25 +70,31 @@ class PastFileSearch(AsyncSearchClient):
         Returns:
             An index of files in a server or channel
         """
-        if isinstance(ctx, discord.Guild):
-            channels = ctx.text_channels
+        if isinstance(source, discord.Guild):
+            channels = source.text_channels
         else:
-            channels = [ctx]
+            channels = [source]
         chan_map = {}
-        if os.path.exists(f"{self.indices_fp}/{ctx.name}.json"):
-            with open(f'{self.indices_fp}/{ctx.name}.json', 'r') as f:
+        if os.path.exists(f"{self.indices_fp}/{source.id}.json"):
+            with open(f'{self.indices_fp}/{source.id}.json', 'r') as f:
                 chan_map = json.load(f)
                 if channel is None:
                     return chan_map
                 if channel in chan_map:
                     return chan_map
+        else:
+            await ctx.send("I haven't yet indexed the channel or server. I may take a while to respond depending on the size of your server.")
         if channel is not None:
-            chan_map[str(channel.id)] = await self.channel_index(channel)
+            chan_map[str(channel.id)], _ = await self.channel_index(channel)
         else:
             for chan in channels:
-                chan_index = await self.channel_index(chan)
-                chan_map[str(chan.id)] = chan_index
-        with open(f'{self.indices_fp}/{ctx.name}.json', 'w') as f:
+                if chan in chan_map:
+                    continue
+                if chan.permissions_for(source.me).read_message_history:
+                    chan_index = await self.channel_index(chan)
+                    chan_map[str(chan.id)] = chan_index
+        chan_map['last_indexed'] = datetime.datetime.now().isoformat()
+        with open(f'{self.indices_fp}/{source.id}.json', 'w') as f:
             json.dump(chan_map, fp=f, indent=4)
         return chan_map
 
@@ -158,7 +167,7 @@ class PastFileSearch(AsyncSearchClient):
         return [file for file in chan_index if self.search_dict_match(file, **query)]
 
     async def search(
-        self, onii_chan: Union[discord.DMChannel, discord.Guild], bot_user=None, *args, **query
+        self, ctx, onii_chan: Union[discord.DMChannel, discord.Guild], bot_user=None, *args, **query
     ) -> List[Dict]:
         """
         Search all channels in a Guild or the provided channel.
@@ -178,7 +187,7 @@ class PastFileSearch(AsyncSearchClient):
         else:
             query['banned_ids'] = self.banned_file_ids
 
-        chan_map = await self.build_index(onii_chan)
+        chan_map = await self.build_index(ctx, onii_chan)
         files = []
         if isinstance(onii_chan, discord.DMChannel):
             files = await self.chan_search(chan_map[str(onii_chan.id)], *args, **query)

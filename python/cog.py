@@ -50,7 +50,6 @@ class Discordfs(commands.Cog):
         self.search_client = search_client
         self.db_client = db_client
         self.sme = sme
-        self.initialize_clients(self.bot.user)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -102,7 +101,7 @@ class Discordfs(commands.Cog):
         embed.add_field(name="Remove",
                         value="Use `/remove` to specify files to make unsearchable", inline=False)
         embed.add_field(name="Search Options",
-                        value="Use these to further refine your search queries!",
+                        value="Use these to refine your search queries!",
                         inline=False)
         for search_opt in search_options:
             embed.add_field(name=search_opt['name'],
@@ -163,7 +162,7 @@ class Discordfs(commands.Cog):
 
         if kwargs.get("channel") and ctx.guild is not None:
             if not kwargs.get("channel").permissions_for(ctx.guild.me).read_message_history:
-                await ctx.send(f"I can't read messages in {kwargs.get('channel').name}!", hidden=kwargs.get("dm", False))
+                await ctx.send(f"I can't read messages in {kwargs.get('channel').name}! Please give me `read_message_history` permissions for {kwargs.get('channel').name}", hidden=kwargs.get("dm", False))
                 return ctx, []
         files = await fsearch(ctx=ctx, search_client=self.search_client, bot=self.bot, **kwargs)
         # TODO: Better Error Handling
@@ -446,14 +445,12 @@ class Discordfs(commands.Cog):
             files: The files to send to the context.
         """
         files = files[:25]
-        # TODO: Display all of the files in the embed if file count <= 5
         if len(files) <= 5:
             buttons = [create_button(style=ButtonStyle.URL,
                                      label=f['filename'],
                                      url=f['jump_url']) for f in files]
             action_row = create_actionrow(*buttons)
         else:
-            # TODO: Sort the files in the select
             options = []
             for file in files:
                 option = create_select_option(
