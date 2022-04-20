@@ -210,6 +210,8 @@ class PastFileSearch(AsyncSearchClient):
         else:
             for chan in onii_chan.text_channels:
                 if chan.permissions_for(bot_user).read_message_history:
+                    if str(chan.id) not in chan_map:
+                        chan_map = await self.build_index(ctx, onii_chan)
                     chan_files = self.chan_search(chan_map[str(chan.id)], *args, **query)
                     files.extend(chan_files)
         if query.get('filename', None):
