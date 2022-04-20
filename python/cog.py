@@ -59,7 +59,7 @@ class Discordfs(commands.Cog):
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
         print(f'Guild ids: {self.guild_ids}')
-        ok = self.initialize_clients(self.bot.user)
+        ok = self.initialize_clients(self.bot)
         if ok:
             print("Clients Initialized!")
 
