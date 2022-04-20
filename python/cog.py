@@ -355,6 +355,7 @@ class Discordfs(commands.Cog):
         if message.guild is not None:
             serv = message.guild
         for file in message.attachments:
+            print(message.content)
             message.content = self.sme.encrypt(message.content)
             await self.search_client.create_doc(file, message)
             await self.db_client.add_file(message)
