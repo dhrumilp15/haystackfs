@@ -215,7 +215,7 @@ class PastFileSearch(AsyncSearchClient):
             source = message.guild
         else:
             source = message.channel
-        filename = os.path.join(self.indices_fp, f'{source.name}.json')
+        filename = os.path.join(self.indices_fp, f'{source.id}.json')
         # only maintain indices for servers that run commands
         if not os.path.exists(filename):
             return
