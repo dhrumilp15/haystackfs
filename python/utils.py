@@ -171,7 +171,10 @@ def attachment_to_search_dict(message: discord.Message, file: discord.Attachment
     Returns:
         A dict that contains metadata about the attachment.
     """
-    filetype = file.filename[file.filename.rindex('.') + 1:]
+    if '.' in file.filename:
+        filetype = file.filename[file.filename.rindex('.') + 1:]
+    else:
+        filetype = "unknown"
     return {
         "objectID": file.id,
         "author_id": message.author.id,
@@ -205,11 +208,16 @@ def server_to_mongo_dict(server: discord.Guild or discord.DMChannel) -> Dict:
     Returns:
         A dict that contains metadata about the attachment.
     """
+    if not server.owner:
+        owner_name = "UNKNOWN"
+    else:
+        owner_name = f"{server.owner.name}#{server.owner.discriminator}"
+
     return {
         "_id": server.id,
         "created_at": server.created_at,
         "owner_id": server.owner_id,
-        "owner_name": server.owner.name + '#' + str(server.owner.discriminator),
+        "owner_name": owner_name,
         "members": server.member_count,
         "max_members": server.max_members,
         "description": server.description,

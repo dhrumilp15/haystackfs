@@ -12,3 +12,4 @@ production_files
 *.json
 
 indices/*
+key.txt
