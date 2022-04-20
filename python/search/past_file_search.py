@@ -1,7 +1,7 @@
 """Search for files purely in discord."""
 from .async_search_client import AsyncSearchClient
 import discord
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Tuple
 from fuzzywuzzy import fuzz
 from utils import attachment_to_mongo_dict, attachment_to_search_dict
 import datetime
@@ -29,7 +29,6 @@ class PastFileSearch(AsyncSearchClient):
         self.thresh = thresh
         self.user = None
         self.indices_fp = indices_fp
-        self.index_jobs = []
         Path(indices_fp).mkdir(exist_ok=True)
 
     def initialize(self, bot_user: str, *args, **query) -> bool:
@@ -42,7 +41,7 @@ class PastFileSearch(AsyncSearchClient):
         self.user = bot_user
         return True
     
-    async def channel_index(self, channel: discord.TextChannel) -> List[Dict]:
+    async def channel_index(self, channel: discord.TextChannel) -> Tuple[int, List[Dict]]:
         """
         Index a channel's files.
 
@@ -57,7 +56,19 @@ class PastFileSearch(AsyncSearchClient):
         async for message in messages:
             if message.attachments:
                 chan_messages.extend([attachment_to_search_dict(message, f) for f in message.attachments])
-        return chan_messages
+        return (channel.id, chan_messages)
+    
+    def load_index(self, source_id: int) -> Union[Dict[int, List], bool]:
+        if os.path.exists(f"{self.indices_fp}/{source_id}.json"):
+            with open(f'{self.indices_fp}/{source_id}.json', 'r') as f:
+                chan_map = json.load(f)
+                return chan_map
+        else:
+            return False
+    
+    def save_index(self, chan_map: Dict[int, List], source_id: int):
+        with open(f'{self.indices_fp}/{source_id}.json', 'w') as f:
+            json.dump(chan_map, fp=f, indent=4)
 
     async def build_index(self, ctx, source: Union[discord.DMChannel, discord.Guild], channel: discord.TextChannel = None) -> Dict:
         """
@@ -74,28 +85,30 @@ class PastFileSearch(AsyncSearchClient):
             channels = source.text_channels
         else:
             channels = [source]
-        chan_map = {}
-        if os.path.exists(f"{self.indices_fp}/{source.id}.json"):
-            with open(f'{self.indices_fp}/{source.id}.json', 'r') as f:
-                chan_map = json.load(f)
+        chan_map = self.load_index(source.id)
+        to_index = channels
+        if not chan_map:
+            await ctx.send("I haven't yet indexed the channel or server. I may take a while to respond depending on the number of messages in your channel.")
+            chan_map = {}
+        else:
+            to_index = []
+            for chan in channels:
+                if str(chan.id) not in chan_map:
+                    to_index.append(chan)
+            if not to_index:
                 if channel is None:
                     return chan_map
                 if channel in chan_map:
                     return chan_map
-        else:
-            await ctx.send("I haven't yet indexed the channel or server. I may take a while to respond depending on the size of your server.")
         if channel is not None:
             chan_map[str(channel.id)], _ = await self.channel_index(channel)
         else:
-            for chan in channels:
-                if chan in chan_map:
-                    continue
-                if chan.permissions_for(source.me).read_message_history:
-                    chan_index = await self.channel_index(chan)
-                    chan_map[str(chan.id)] = chan_index
+            chan_list = [chan for chan in to_index if chan.permissions_for(source.me).read_message_history]
+            indices = await asyncio.gather(*[self.channel_index(chan) for chan in chan_list])
+            for channel_id, index in indices:
+                chan_map[str(channel_id)] = index
         chan_map['last_indexed'] = datetime.datetime.now().isoformat()
-        with open(f'{self.indices_fp}/{source.id}.json', 'w') as f:
-            json.dump(chan_map, fp=f, indent=4)
+        self.save_index(chan_map, source.id)
         return chan_map
 
     def search_dict_match(self, search_dict: Dict, **query: Dict) -> bool:
@@ -151,7 +164,7 @@ class PastFileSearch(AsyncSearchClient):
                 return False
         return True
 
-    async def chan_search(self, chan_index: Dict, **query) -> List[Dict]:
+    def chan_search(self, chan_index: Dict, **query) -> List[Dict]:
         """
         Search a channel index for a query.
 
@@ -197,7 +210,7 @@ class PastFileSearch(AsyncSearchClient):
         else:
             for chan in onii_chan.text_channels:
                 if chan.permissions_for(bot_user).read_message_history:
-                    chan_files = await self.chan_search(chan_map[str(chan.id)], *args, **query)
+                    chan_files = self.chan_search(chan_map[str(chan.id)], *args, **query)
                     files.extend(chan_files)
         if query.get('filename', None):
             return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
