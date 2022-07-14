@@ -453,8 +453,11 @@ class Discordfs(commands.Cog):
         else:
             options = []
             for file in files:
+                name = file['filename']
+                if len(name) >= 100:
+                    name = name[:97] + '...'
                 option = create_select_option(
-                    label=file['filename'],
+                    label=name,
                     value=','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
                 )
                 options.append(option)

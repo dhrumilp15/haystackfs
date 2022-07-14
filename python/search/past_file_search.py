@@ -56,7 +56,7 @@ class PastFileSearch(AsyncSearchClient):
         async for message in messages:
             if message.attachments:
                 chan_messages.extend([attachment_to_search_dict(message, f) for f in message.attachments])
-        return (channel.id, chan_messages)
+        return channel.id, chan_messages
     
     def load_index(self, source_id: int) -> Union[Dict[int, List], bool]:
         if os.path.exists(f"{self.indices_fp}/{source_id}.json"):
