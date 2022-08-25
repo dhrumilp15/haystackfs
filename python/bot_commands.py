@@ -28,11 +28,19 @@ async def fremove(ctx: SlashContext or commands.Context,
         A list of filenames that were deleted
     """
     author = ctx.author
-    serv_id = ctx.channel
+    serv = ctx.channel
     if ctx.guild is not None:
-        serv_id = ctx.guild
+        serv = ctx.guild
+    bot_user = None
+    if ctx.guild is not None:
+        bot_user = ctx.guild.me
 
-    files = await search_client.search(serv_id, **kwargs)
+    files = await search_client.search(
+        ctx,
+        serv,
+        bot_user=bot_user,
+        **kwargs
+    )
 
     manageable_files = filter_messages_with_permissions(
         author,
@@ -43,9 +51,7 @@ async def fremove(ctx: SlashContext or commands.Context,
     if not manageable_files:
         return f"I couldn't find any files that you can access."
     res = await search_client.remove_doc(
-        [file['objectID'] for file in manageable_files],
-        serv_id,
-        author.name + "#" + author.discriminator
+        [file['objectID'] for file in manageable_files]
     )
     if not res.get('objectIDs'):
         return []
@@ -58,7 +64,7 @@ async def fremove(ctx: SlashContext or commands.Context,
 async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSearchClient,
                   mg_client: MgClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
-    Remove files from our storage and delete their corresponding discord messages.
+    Remove files from database and search. Also delete their corresponding discord messages.
 
     Args:
         ctx: The message's origin
@@ -71,10 +77,20 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
         A list of filenames that were deleted
     """
     author = ctx.author
-    serv_id = ctx.channel.id
+    serv = ctx.channel
     if ctx.guild is not None:
-        serv_id = ctx.guild.id
-    files = await search_client.search(serv_id, **kwargs)
+        serv = ctx.guild
+    bot_user = None
+    if ctx.guild is not None:
+        bot_user = ctx.guild.me
+
+    files = await search_client.search(
+        ctx,
+        serv,
+        bot_user=bot_user,
+        **kwargs
+    )
+
     manageable_files = filter_messages_with_permissions(
         author,
         files,
@@ -85,9 +101,7 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
         return f"I couldn't find any files that you can access."
     deleted_files = []
     await search_client.remove_doc(
-        [file['objectID'] for file in manageable_files],
-        serv_id,
-        author.name + "#" + author.discriminator
+        [file['objectID'] for file in manageable_files]
     )
     await mg_client.remove_file([file['objectID'] for file in manageable_files])
     for file in manageable_files:
@@ -117,16 +131,16 @@ async def fsearch(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    onii_chan = ctx.channel
+    serv = ctx.channel
     if ctx.guild is not None:
-        onii_chan = ctx.guild
+        serv = ctx.guild
     bot_user = None
     if ctx.guild is not None:
         bot_user = ctx.guild.me
 
     files = await search_client.search(
         ctx,
-        onii_chan,
+        serv,
         bot_user=bot_user,
         **kwargs
     )
