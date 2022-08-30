@@ -183,6 +183,7 @@ class Discordfs(commands.Cog):
         options=search_options,
         guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
+    @log_command
     async def slash_search(self, ctx: SlashContext, **kwargs):
         """
         Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
