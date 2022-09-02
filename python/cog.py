@@ -368,6 +368,7 @@ class Discordfs(commands.Cog):
         Args:
             payload: A discord.RawMessageDeleteEvent event.
         """
+        await self.search_client.remove_doc(payload.message_id, payload.guild_id, payload.channel_id)
         await self.db_client.remove_file([payload.message_id], field="message_id")
 
     @commands.Cog.listener()

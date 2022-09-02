@@ -249,7 +249,32 @@ class PastFileSearch(AsyncSearchClient):
         """We don't maintain search indices in this class, so this is not needed."""
         return
 
-    async def remove_doc(self, file_ids: list, *args, **kwargs):
+    def delete_doc(self, file_id: int, source_id: int, channel_id: int, *args, **kwargs):
+        print(file_id, "deleting")
+        filename = os.path.join(self.indices_fp, f'{source_id}.json')
+        with open(filename, 'r') as f:
+            chan_map = json.load(f)
+        
+        for file in chan_map[str(channel_id)]:
+            if file['message_id'] == file_id:
+                chan_map[str(channel_id)].remove(file)
+
+        with open(filename, 'w') as f:
+            json.dump(chan_map, fp=f, indent=4)
+        print("deleted")
+
+    def ban_doc(self, file_id: int):
+        self.banned_file_ids.add(file_id)
+
+    async def remove_doc(self, file_id: int, guild_id: int, channel_id: int,  *args, **kwargs):
         """Update banned ids with the file ids."""
-        for file_id in file_ids:
-            self.banned_file_ids.add(file_id)
+        # Ban Doc
+        self.ban_doc(file_id)
+
+        # Delete doc from memory (indices folder)
+        if not guild_id:
+            # Set source id to be channel id when working with a DM
+            self.delete_doc(file_id, channel_id, channel_id)
+        else:
+            # Set source id to be guild id when working with a server msg
+            self.delete_doc(file_id, guild_id, channel_id)
