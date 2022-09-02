@@ -179,26 +179,23 @@ class MgClient:
             return 0
         files_coll = self.db.files
         files_added = 0
-        try:
-            # We've already added the files in this message id
-            num_docs = await files_coll.count_documents({"message_id": message.id}, limit=1)
-            if num_docs:
-                return True
-            for file in message.attachments:
-                # We've already added this file
-                n_doc = await files_coll.count_documents({"_id": file.id}, limit=1)
-                if n_doc:
-                    continue
-                file_info = utils.attachment_to_mongo_dict(message, file)
-                res = await files_coll.insert_one(file_info)
-                if res.acknowledged:
-                    logger.info(f"Inserted new file: {res.inserted_id} with file id: {file.id}")
-                    files_added += 1
-                else:
-                    logger.error(f"Failed to insert file with _id: {file.id}")
-            return files_added
-        except:
-            return 0
+        # We've already added the files in this message id
+        num_docs = await files_coll.count_documents({"message_id": message.id}, limit=1)
+        if num_docs:
+            return True
+        for file in message.attachments:
+            # We've already added this file
+            n_doc = await files_coll.count_documents({"_id": file.id}, limit=1)
+            if n_doc:
+                continue
+            file_info = utils.attachment_to_mongo_dict(message, file)
+            res = await files_coll.insert_one(file_info)
+            if res.acknowledged:
+                logger.info(f"Inserted new file: {res.inserted_id} with file id: {file.id}")
+                files_added += 1
+            else:
+                logger.error(f"Failed to insert file with _id: {file.id}")
+        return files_added
 
     async def remove_file(self, ids: List[str], field: str = "_id") -> bool:
         """
