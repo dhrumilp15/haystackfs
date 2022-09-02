@@ -255,7 +255,7 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
         "author": message.author.id,
         "author_name": message.author.name + '#' + str(message.author.discriminator),
         "channel_id": message.channel.id,
-        "guild_id": message.guild.id if message.guild.id is not None else -1,
+        "guild_id": message.guild.id if message.guild is not None else -1,
         "content": message.content,
         "created_at": message.created_at,
         "file_name": file.filename,
