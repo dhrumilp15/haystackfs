@@ -5,28 +5,25 @@ from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
 from mongo_client import MgClient
+from config import CONFIG
+import logging
+from discord import app_commands
 from utils import search_options, dm_option
 from bot_commands import fdelete, fremove, fsearch
 from export_template import generate_script
-from config import CONFIG
-import logging
-from discord_slash import SlashContext, cog_ext
-from discord_slash.utils.manage_components import create_select, create_select_option, create_actionrow, create_button
-from discord_slash.model import ButtonStyle
-from discord_slash.context import ComponentContext
 from discord.ext import commands, tasks
 import discord
 import datetime
 from dateutil import parser
 import glob
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Optional
 import io
 import re
 import hashlib
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
-    guild_ids = [int(CONFIG.GUILD_ID)]
+    guild_ids = [discord.Object(id=int(CONFIG.GUILD_ID))]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -42,7 +39,7 @@ class Discordfs(commands.Cog):
     def __init__(self, guild_ids: list, bot,
                  search_client: AsyncSearchClient,
                  db_client: MgClient,
-                 sme: SymmetricMessageEncryptor):
+                 sme: SymmetricMessageEncryptor) -> None:
         """Instantiate the bot."""
         self.bot = bot
         self.guild_ids = guild_ids
@@ -59,7 +56,13 @@ class Discordfs(commands.Cog):
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
         print(f'Guild ids: {self.guild_ids}')
+
         ok = self.initialize_clients(self.bot)
+
+        if self.guild_ids:
+            self.bot.tree.add_command(self.slash_help, guild=guild_ids[0])
+            await self.bot.tree.sync(guild=guild_ids[0])
+            print("Synced slash help!!")
         if ok:
             print("Clients Initialized!")
 
@@ -79,6 +82,24 @@ class Discordfs(commands.Cog):
             return await function(self, *args, **kwargs)
         return wrapper
 
+
+    def interface_function(function):
+        """
+        Default wrapper for most public interface functions
+        """
+        @wraps(function)
+        @app_commands.Argument(**search_options[0])
+        @app_commands.Argument(**search_options[1])
+        @app_commands.Argument(**search_options[2])
+        @app_commands.Argument(**search_options[3])
+        @app_commands.Argument(**search_options[4])
+        @app_commands.Argument(**search_options[5])
+        @app_commands.Argument(**search_options[6])
+        @app_commands.Argument(**search_options[7])
+        async def wrapper(self, *args, **kwargs):
+            return await function(self, *args, **kwargs)
+        return wrapper
+
     def build_help_embed(self) -> discord.Embed:
         """
         Build help embed.
@@ -86,52 +107,47 @@ class Discordfs(commands.Cog):
         Returns:
             The help embed
         """
-        embed = discord.Embed(
-            title=f'{self.bot.user.name}',
-            color=discord.Color.teal()
-        )
-        embed.add_field(name=f"What does {self.bot.user.name} do?",
-                        value=f"Use {self.bot.user.name} to search for your discord files.\n"
+        name = self.bot.user.name
+        avatar_url = self.bot.user.display_avatar.url
+        embed = discord.Embed(title=f'{name}', color=discord.Color.teal())
+        embed.add_field(name=f"What does {name} do?",
+                        value=f"Use {name} to search for your discord files.\n"
                         "Use commands to search, delete or remove files.\n"
                         "Specifying search options can refine your queries.")
         embed.add_field(name="Search",
-                        value="Use `/search` to search for files. Selecting no options retrieves all files.", inline=False)
-        embed.add_field(name="Delete",
-                        value="Use `/delete` to specify files to delete", inline=False)
-        embed.add_field(name="Remove",
-                        value="Use `/remove` to specify files to make unsearchable", inline=False)
-        embed.add_field(name="Search Options",
-                        value="Use these to refine your search queries!",
+                        value="Use `/search` to search for files. Selecting no options retrieves all files.",
                         inline=False)
+        embed.add_field(name="Delete", value="Use `/delete` to specify files to delete", inline=False)
+        embed.add_field(name="Remove", value="Use `/remove` to specify files to make unsearchable", inline=False)
+        embed.add_field(name="Search Options", value="Use these to refine your search queries!", inline=False)
         for search_opt in search_options:
             embed.add_field(name=search_opt['name'],
                             value=search_opt['description'])
-        embed.set_footer(
-            text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
-            icon_url=self.bot.user.avatar_url)
+        embed.set_footer(text=f"Delivered by {name}, a better file manager for discord.",
+                         icon_url=avatar_url)
         return embed
 
-    @cog_ext.cog_slash(
+    @app_commands.command(
         name="help",
         description="A help command",
-        options=[dm_option],
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+        # options=[dm_option],
+        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
-    async def slash_help(self, ctx: SlashContext, dm: bool = False):
+    @app_commands.describe(dm="If true, I'll dm results to you.")
+    async def slash_help(self, interaction: discord.Interaction, dm: Optional[bool]=False) -> None:
         """
         Responds to /help. Displays a help command with commands and search options.
 
         Args:
-            ctx: The SlashContext from which the command was issued
+            interaction: The context from which the command was issued
             dm: Whether to display the command only to the author
         """
-        await ctx.defer(hidden=dm)
+        await interaction.response.defer(ephemeral=dm)
         embed = self.build_help_embed()
-        await ctx.send(embed=embed, hidden=dm)
+        await interaction.followup.send(embed=embed, ephemeral=dm)
 
-    async def locate(
-        self, ctx: SlashContext, **kwargs
-    ) -> Tuple[Union[SlashContext, discord.member.Member, discord.user.ClientUser], List[Dict]]:
+    async def locate(self, ctx: discord.Interaction, **kwargs
+    ) -> Tuple[Union[discord.Interaction, discord.member.Member, discord.user.ClientUser], List[Dict]]:
         """
         Turn arguments into a search and return the files.
 
@@ -175,15 +191,16 @@ class Discordfs(commands.Cog):
             recipient = ctx.author
             await ctx.send("DM'ing your files...", hidden=True)
 
-        return (recipient, files)
+        return recipient, files
 
-    @cog_ext.cog_slash(
+    @app_commands.command(
         name="search",
         description="Search for files.",
-        options=search_options,
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+        # options=search_options,
+        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
-    async def slash_search(self, ctx: SlashContext, **kwargs):
+    @interface_function
+    async def slash_search(self, ctx: discord.Interaction, filename: Optional[str]=None):
         """
         Responds to `/search`. Tries to display docs related to a query from ElasticSearch.
 
@@ -192,17 +209,18 @@ class Discordfs(commands.Cog):
             filename: A str of the filename to query for.
             DM: A bool for whether to dm the author the results.
         """
-        recipient, files = await self.locate(ctx, **kwargs)
+        recipient, files = await self.locate(ctx)
         if files:
             await self.send_files_as_message(recipient, files)
 
-    @cog_ext.cog_slash(
+    @app_commands.command(
         name="export",
         description="Get a Python export script to download the files returned in a search to your computer.",
-        options=search_options,
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+        # options=search_options,
+        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
-    async def slash_export(self, ctx: SlashContext, **kwargs):
+    @interface_function
+    async def slash_export(self, ctx: discord.Interaction, **kwargs):
         """
         Responds to `/export`. Tries get a download script for all files related to a query from ElasticSearch.
 
@@ -244,14 +262,15 @@ class Discordfs(commands.Cog):
                 file=discord.File(export_script, filename=filename)
             )
 
-    @cog_ext.cog_slash(
+    @app_commands.command(
         name="delete",
         description="Delete files AND their respective messages",
-        options=search_options,
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+        # options=search_options,
+        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def slash_delete(self, ctx, **kwargs):
+    @interface_function
+    async def slash_delete(self, ctx: discord.Interaction, **kwargs):
         """
         Responds to `/delete`. Tries to remove docs related to a query and their respective discord messages.
 
@@ -266,14 +285,15 @@ class Discordfs(commands.Cog):
             return
         await ctx.send(content=f"Deleted {' '.join(deleted_files)}", hidden=True)
 
-    @cog_ext.cog_slash(
+    @app_commands.command(
         name="remove",
         description="Remove files from index (These files will no longer be searchable!!)",
-        options=search_options,
-        guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
+        # options=search_options,
+        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @log_command
-    async def slash_remove(self, ctx: SlashContext, **kwargs):
+    @interface_function
+    async def slash_remove(self, ctx: discord.Interaction, **kwargs):
         """
         Responds to `/remove`. Tries to remove docs related to a query from applicable search indices.
 
@@ -345,6 +365,7 @@ class Discordfs(commands.Cog):
             Indexes any message attachments with ElasticSearch.
         For queries:
             Processes the appropriate queries.
+
         Args:
             message: A discord.Message that represents the newest message.
         """
@@ -354,9 +375,9 @@ class Discordfs(commands.Cog):
         serv = message.channel
         if message.guild is not None:
             serv = message.guild
-        for file in message.attachments:
+        if message.attachments:
             message.content = self.sme.encrypt(message.content)
-            await self.search_client.create_doc(file, message)
+            await self.search_client.create_doc(message)
             await self.db_client.add_file(message)
         await self.bot.process_commands(message)
 
@@ -414,7 +435,7 @@ class Discordfs(commands.Cog):
         await self.db_client.clear_message_content()
 
     @commands.Cog.listener()
-    async def on_component(self, ctx: ComponentContext):
+    async def on_component(self, ctx):
         """
         Update origin component.
 
@@ -436,7 +457,7 @@ class Discordfs(commands.Cog):
             embed.set_image(url=media_url)
             await ctx.edit_origin(embed=embed)
 
-    async def send_files_as_message(self, ctx: SlashContext, files: List[Dict]):
+    async def send_files_as_message(self, ctx: discord.Interaction, files: List[Dict]):
         """
         Send files as a message to ctx.
 
@@ -444,51 +465,53 @@ class Discordfs(commands.Cog):
             ctx: The originating context.
             files: The files to send to the context.
         """
-        files = files[:25]
-        if len(files) <= 5:
-            buttons = [create_button(style=ButtonStyle.URL,
-                                     label=f['filename'],
-                                     url=f['jump_url']) for f in files]
-            action_row = create_actionrow(*buttons)
-        else:
-            options = []
-            for file in files:
-                name = file['filename']
-                if len(name) >= 100:
-                    name = name[:97] + '...'
-                option = create_select_option(
-                    label=name,
-                    value=','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
-                )
-                options.append(option)
-            select = create_select(
-                options=options,
-                placeholder="Choose your files here!",
-                min_values=1,
-                max_values=1
-            )
-            action_row = create_actionrow(select)
-        embed = discord.Embed(
-            title=f"Found {len(files)} file{'s' if len(files) > 1 else ''}",
-            color=discord.Colour.teal())
-        embed.set_footer(
-            text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
-            icon_url=self.bot.user.avatar_url)
-        filename = files[0].get('filename')
-        mediaUrl = files[0].get('jump_url')
-        if not mediaUrl:
-            file_id = files[0]['objectID']
-            res = await self.db_client.get_file(file_id)
-            mediaUrl = res['url']
-        embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
-        if files[0].get('content_type', None):
-            if 'image' in files[0]['content_type']:
-                embed.set_image(url=files[0]['url'])
-        await ctx.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
-                       embed=embed, components=[action_row])
+        print(files)
+        print("SEND MESSAGE!!")
+        # files = files[:25]
+        # if len(files) <= 5:
+        #     buttons = [create_button(style=ButtonStyle.URL,
+        #                              label=f['filename'],
+        #                              url=f['jump_url']) for f in files]
+        #     action_row = create_actionrow(*buttons)
+        # else:
+        #     options = []
+        #     for file in files:
+        #         name = file['filename']
+        #         if len(name) >= 100:
+        #             name = name[:97] + '...'
+        #         option = create_select_option(
+        #             label=name,
+        #             value=','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
+        #         )
+        #         options.append(option)
+        #     select = create_select(
+        #         options=options,
+        #         placeholder="Choose your files here!",
+        #         min_values=1,
+        #         max_values=1
+        #     )
+        #     action_row = create_actionrow(select)
+        # embed = discord.Embed(
+        #     title=f"Found {len(files)} file{'s' if len(files) > 1 else ''}",
+        #     color=discord.Colour.teal())
+        # embed.set_footer(
+        #     text=f"Delivered by {self.bot.user.name}, a better file manager for discord.",
+        #     icon_url=self.bot.user.avatar_url)
+        # filename = files[0].get('filename')
+        # mediaUrl = files[0].get('jump_url')
+        # if not mediaUrl:
+        #     file_id = files[0]['objectID']
+        #     res = await self.db_client.get_file(file_id)
+        #     mediaUrl = res['url']
+        # embed.insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
+        # if files[0].get('content_type', None):
+        #     if 'image' in files[0]['content_type']:
+        #         embed.set_image(url=files[0]['url'])
+        # await ctx.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
+        #                embed=embed, components=[action_row])
 
 
-def setup(bot):
+async def setup(bot):
     """
     Set up the bot.
 
@@ -502,4 +525,4 @@ def setup(bot):
     searcher = PastFileSearch()
     mg_client = MgClient(getattr(CONFIG, 'MONGO_ENDPOINT', None), getattr(CONFIG, 'DB_NAME', None))
     sme = SymmetricMessageEncryptor(Fernet, CONFIG)
-    bot.add_cog(Discordfs(guild_ids, bot, searcher, mg_client, sme))
+    await bot.add_cog(Discordfs(guild_ids, bot, searcher, mg_client, sme))

@@ -14,8 +14,8 @@ class SymmetricMessageEncryptor:
         """
         self.config = config
         self.key = key
-        if 'key' in self.config:
-            self.key = self.config.key
+        if 'KEY' in self.config:
+            self.key = self.config.KEY
         self.cipher = algorithm(self.key)
 
     def encrypt(self, message: str) -> str:
