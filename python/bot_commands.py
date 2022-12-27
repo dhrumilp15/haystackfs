@@ -104,9 +104,12 @@ async def fsearch(interaction: discord.Interaction or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    onii_chan = interaction.channel
-    if interaction.guild is not None:
-        onii_chan = interaction.guild
+    onii_chan = [kwargs['channel']]
+    if onii_chan[0] is None:
+        onii_chan = interaction.channel
+        if interaction.guild is not None:
+            onii_chan = interaction.guild.text_channels
+
     bot_user = None
     if interaction.guild is not None:
         bot_user = interaction.guild.me
@@ -120,12 +123,4 @@ async def fsearch(interaction: discord.Interaction or commands.Context,
     if not files:
         return f"I couldn't find any files related to your query. I may not have the `read_message_history` permission for some channels."
 
-    manageable_files = filter_messages_with_permissions(
-        author=interaction.author,
-        files=files,
-        perm=discord.Permissions(read_message_history=True),
-        bot=bot
-    )
-    if not manageable_files:
-        return f"I couldn't find any files that you can access."
-    return manageable_files
+    return files

@@ -11,3 +11,4 @@ aiohttp>=2.0,<4.0
 async_timeout>=2.0,<4.0
 fuzzywuzzy[speedup]
 cryptography
+aiofiles==22.1.0

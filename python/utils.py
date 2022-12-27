@@ -23,8 +23,7 @@ CONTENT_TYPE_CHOICES = list(map(lambda opt: discord.app_commands.Choice(**opt), 
 
 dm_option = {
     "name":"dm",
-    "description":"If `True`, I'll dm you what I find. \
-                Otherwise, I'll send it to this channel",
+    "description":"If `True`, I'll dm you what I find. Otherwise, I'll send it to this channel",
     "option_type": discord.AppCommandOptionType.boolean,
     "required": False
 }
@@ -69,20 +68,20 @@ search_options = [
 },
 {
         "name":"after",
-        "description":"Search for files after a date. \
-                Use the `before` option to specify a range of dates",
+        "description":"Search for files after a date. Use the `before` option to specify a range of dates",
         "option_type":discord.AppCommandOptionType.string,
         "required":False
 },
 {
         "name":"before",
-        "description":"Search for files before a date. \
-                Use the `after` option to specify a range of dates",
+        "description":"Search for files before a date. Use the `after` option to specify a range of dates",
         "option_type":discord.AppCommandOptionType.string,
         "required":False
 },
     dm_option
 ]
+
+search_opts = {opt['name']: opt['description'] for opt in search_options}
 
 
 def filter_messages_with_permissions(author: discord.User, files: List[Dict], perm: discord.Permissions, bot: Bot) -> List[Dict]:

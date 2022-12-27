@@ -1,16 +1,14 @@
 """Search for files purely in discord."""
 from .async_search_client import AsyncSearchClient
 import discord
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union
 from fuzzywuzzy import fuzz
 from utils import attachment_to_mongo_dict, attachment_to_search_dict
 import json
 from pathlib import Path
-from dateutil import parser
 import asyncio
+import aiofiles
 import os
-import itertools
-import heapq
 
 
 class PastFileSearch(AsyncSearchClient):
@@ -55,7 +53,7 @@ class PastFileSearch(AsyncSearchClient):
         messages = channel.history(limit=None)
         async for message in messages:
             if message.attachments:
-                yield map(attachment_to_search_dict, message.attachments)
+                yield map(lambda atchmt: attachment_to_search_dict(message, atchmt), message.attachments)
 
     def construct_index_file_path(self, onii_chan: discord.TextChannel) -> str:
         """
@@ -69,42 +67,84 @@ class PastFileSearch(AsyncSearchClient):
             "{self.indices_fp}/{channel id}.json"
         """
         source = onii_chan.id
-        filepath = str(source.id)
+        filepath = str(source)
         if onii_chan.guild is not None:
             filepath = os.path.join(str(onii_chan.guild.id), filepath)
+        filepath = os.path.join(self.indices_fp, filepath)
         filepath += ".json"
         return filepath
 
-    async def load_index(self, ctx, onii_chans: List[Union[discord.DMChannel, discord.TextChannel]]):
+    async def channel_index_writer(self, onii_chan: discord.TextChannel):
+        filepath = self.construct_index_file_path(onii_chan)
+        if not os.path.exists(filepath):
+            buffer = {filepath: []}
+            async for file_attachments in self.channel_index(onii_chan):
+                for file in file_attachments:
+                    existing_files = buffer.get(filepath, [])
+                    if len(existing_files) >= self.write_buffer_size:
+                        await self.create_doc(filepath_to_metadata=buffer)
+                        buffer[filepath] = []
+                    existing_files.append(file)
+                    buffer[filepath] = existing_files
+            await self.create_doc(filepath_to_metadata=buffer)
+
+    def search_dict_match(self, metadata, **query):
+        for key, value in query.items():
+            if value is None:
+                continue
+            if key == "content" or key == "filename" or key == "custom_filetype":
+                score = fuzz.partial_ratio(value.lower(), metadata[key].lower())
+                if score < self.thresh:
+                    return False
+            elif key == "after":
+                if metadata['created_at'] < value:
+                    return False
+            elif key == "before":
+                if metadata['created_at'] > value:
+                    return False
+            elif key == "author" or key == "channel":
+                if metadata[key + "_id"] != value:
+                    return False
+            elif key == "filetype":
+                filetype = metadata['content_type']
+                if filetype is None:
+                    value = value[value.index('/') + 1:]
+                    filetype = metadata['filetype']
+                if filetype == "jpeg" or filetype == "jpg":
+                    filetype = "jpg"
+                if value == "jpeg" or value == "jpg":
+                    value = "jpg"
+                if value == 'image' or value == 'audio':
+                    if value not in filetype:
+                        return False
+                else:
+                    if value != filetype:
+                        return False
+        return True
+
+    async def load_index(self, interaction: discord.Interaction, onii_chans: List[discord.TextChannel]):
         """
         Builds indices for the target channels if needed
 
         Args:
-            ctx: The original interaction that created the search request
+            interaction: The original interaction that created the search request
             onii_chans: The source text channels
         """
-        responded = False
+        not_indexed_channels = []
         for onii_chan in onii_chans:
-            filepath = self.construct_index_file_path(onii_chan)
+            filepath = self.construct_index_file_path(onii_chan=onii_chan)
             if not os.path.exists(filepath):
-                if not responded:
-                    await ctx.send("I haven't indexed this channel/server and may take a while to respond.")
-                    responded = True
-                buffer = {}
-                async for file_attachments in self.channel_index(onii_chan):
+                not_indexed_channels.append(onii_chan)
+        if not_indexed_channels:
+            await interaction.followup.send("I haven't indexed this channel/server yet and may take a while to respond.")
 
-                    while file_attachments:
-                        existing_files = buffer.get(filepath, [])
-                        remaining_length = self.write_buffer_size - len(existing_files)
-                        new_achmts = list(itertools.islice(file_attachments, remaining_length))
-                        buffer[filepath] = existing_files.extend(new_achmts)
-                        if len(buffer[filepath]) > self.write_buffer_size:
-                            self.create_doc(filepath_to_metadata=buffer)
-                            buffer[filepath] = []
-                if buffer:
-                    self.create_doc(filepath_to_metadata=buffer)
+        tasks = []
+        for onii_chan in not_indexed_channels:
+            tasks.append(asyncio.ensure_future(self.channel_index_writer(onii_chan)))
 
-    def chan_search(self, onii_chan: discord.TextChannel, **query) -> List[Dict]:
+        await asyncio.gather(*tasks)
+
+    async def chan_search(self, onii_chan: discord.TextChannel, **query) -> List[Dict]:
         """
         Search a channel index for a query.
 
@@ -118,39 +158,20 @@ class PastFileSearch(AsyncSearchClient):
         if self.user is None:
             return []
         filepath = self.construct_index_file_path(onii_chan=onii_chan)
+        # this channel has no attachments
+        if not os.path.exists(filepath):
+            return []
         files = []
-        with open(filepath, 'r') as f:
-            for md in f.readlines():
+        async with aiofiles.open(filepath, 'r') as f:
+            async for md in f:
                 metadata = json.loads(md)
-                for key, value in query.items():
-                    if key == "content" or key == "filename" or key == "custom_filetype":
-                        score = fuzz.partial_ratio(value.lower(), metadata[key].lower())
-                        if score < self.thresh:
-                            break
-                    elif key == "after":
-                        if metadata['created_at'] < value:
-                            break
-                    elif key == "before":
-                        if metadata['created_at'] > value:
-                            break
-                    elif key == "author" or key == "channel":
-                        if metadata[key + "_id"] != value:
-                            break
-                    elif key == "filetype":
-                        filetype = metadata['content_type']
-                        if filetype is None:
-                            filetype = metadata['filetype']
-                        if value == 'image' or value == 'audio':
-                            if value not in filetype:
-                                break
-                        else:
-                            if value != filetype:
-                                break
-                else:
-                    if metadata['objectID'] not in self.banned_file_ids:
-                        files.append(metadata)
+                if metadata['objectID'] in self.banned_file_ids:
+                    continue
+                if self.search_dict_match(metadata=metadata, **query):
+                    files.append(metadata)
+        return files
 
-    async def search(self, ctx, onii_chans: List[Union[discord.DMChannel, discord.Guild]], bot_user=None, **query) -> List[Dict]:
+    async def search(self, interaction: discord.Interaction, onii_chans: List[Union[discord.DMChannel, discord.Guild]], bot_user=None, **query) -> List[Dict]:
         """
         Search all channels in a Guild or the provided channel.
 
@@ -171,13 +192,14 @@ class PastFileSearch(AsyncSearchClient):
         else:
             query['banned_ids'] = self.banned_file_ids
 
-        onii_chans = list(filter(lambda chan: chan.permissions_for(self.user).read_message_history, onii_chans))
-        await self.load_index(ctx, onii_chans)
-        files = []
+        onii_chans = list(filter(lambda chan: chan.permissions_for(bot_user).read_message_history, onii_chans))
+        await self.load_index(interaction, onii_chans)
 
+        tasks = []
         for onii_chan in onii_chans:
-            matched_files = self.chan_search(onii_chan, **query)
-            files.extend(matched_files)
+            tasks.append(asyncio.ensure_future(self.chan_search(onii_chan, **query)))
+        res = await asyncio.gather(*tasks)
+        files = [r for ress in res for r in ress]
 
         if query.get('filename'):
             return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))
@@ -202,14 +224,18 @@ class PastFileSearch(AsyncSearchClient):
                 files = list(map(attachment_to_search_dict, message.attachments))
                 existing_files = filepath_to_metadata.get(filepath, [])
                 filepath_to_metadata[filepath] = existing_files.extend(files)
-
         for filepath in filepath_to_metadata:
-            Path(filepath).mkdir(exist_ok=True)
+            dir_name = os.path.dirname(filepath)
+            Path(dir_name).mkdir(exist_ok=True)
             message_attachments = filepath_to_metadata[filepath]
-            with open(filepath, 'a') as f:
+            mode = 'a'
+            if not os.path.exists(filepath):
+                mode = 'w'
+            async with aiofiles.open(filepath, mode=mode) as f:
                 for file in message_attachments:
-                    json.dump(file, f)
-                    f.write(os.linesep)
+                    res = json.dumps(file)
+                    await f.write(res)
+                    await f.write(os.linesep)
 
     async def remove_doc(self, file_ids: list, *args, **kwargs):
         """Update banned ids with the file ids."""
