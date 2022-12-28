@@ -4,7 +4,8 @@ from functools import wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
 from search.past_file_search import PastFileSearch
-from mongo_client import MgClient
+from database.async_data_client import AsyncDataClient
+from database.file_data_client import FileDataClient
 from config import CONFIG
 import logging
 from discord import app_commands
@@ -37,9 +38,9 @@ logger.addHandler(fh)
 class Discordfs(commands.Cog):
     """Main class for the bot."""
 
-    def __init__(self, guild_ids: list, bot,
+    def __init__(self, guild_ids: List, bot,
                  search_client: AsyncSearchClient,
-                 db_client: MgClient,
+                 db_client: AsyncDataClient,
                  sme: SymmetricMessageEncryptor) -> None:
         """Instantiate the bot."""
         self.bot = bot
@@ -75,6 +76,7 @@ class Discordfs(commands.Cog):
         """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
+            print("Calling a log command!")
             await self.db_client.log_command(function, *args, **kwargs)
             return await function(self, *args, **kwargs)
         return wrapper
@@ -195,6 +197,7 @@ class Discordfs(commands.Cog):
     @app_commands.command(name="search", description="Epic command")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
+    @log_command
     async def slash_search(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -213,11 +216,11 @@ class Discordfs(commands.Cog):
         if files:
             await self.send_files_as_message(recipient, files)
 
-    @log_command
     @app_commands.command(name="export",
                           description="Get a Python export script to download the files returned in a search to your computer.")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
+    @log_command
     async def slash_export(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -265,11 +268,11 @@ class Discordfs(commands.Cog):
                 f"Found {len(files)} file(s). Run this script to download them.",
                 file=discord.File(export_script, filename=filename))
 
-    @log_command
     @app_commands.command(name="delete",
                           description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
+    @log_command
     async def slash_delete(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -290,10 +293,10 @@ class Discordfs(commands.Cog):
             return
         await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
 
-    @log_command
     @app_commands.command(name="remove", description="Remove files from index (These files will no longer be searchable!!)")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
+    @log_command
     async def slash_remove(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -485,6 +488,6 @@ async def setup(bot):
     #                           getattr(CONFIG, 'ALGOLIA_ADMIN_KEY', None))
     # searcher = Searcher(ag_client, PastFileSearch())
     searcher = PastFileSearch()
-    mg_client = MgClient(getattr(CONFIG, 'MONGO_ENDPOINT', None), getattr(CONFIG, 'DB_NAME', None))
+    command_client = FileDataClient()
     sme = SymmetricMessageEncryptor(Fernet, CONFIG)
-    await bot.add_cog(Discordfs(guild_ids, bot, searcher, mg_client, sme))
+    await bot.add_cog(Discordfs(guild_ids, bot, searcher, command_client, sme))

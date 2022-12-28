@@ -1,4 +1,6 @@
 """Main Bot Controller."""
+import traceback
+
 from config import CONFIG
 import logging
 from discord.ext import commands
@@ -9,6 +11,7 @@ import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
 from discord.ext.commands import Greedy, Context # or a subclass of yours
+import traceback
 
 # logging
 dlogger = logging.getLogger('discord')

@@ -1,5 +1,7 @@
 """MongoDB Client."""
 import logging
+import traceback
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 import discord
@@ -10,6 +12,8 @@ from config import CONFIG
 import utils
 import os
 from bson import json_util
+import traceback
+
 # import utils.server_to_mongo_dict as server_to_mongo_dict
 # import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
 logger = logging.getLogger(__name__)
@@ -26,7 +30,7 @@ class MgClient:
     def __init__(self, mongo_endpoint: str = None, db_name: str = None):
         """Initialize the MongoDB Client and database."""
         self.client, self.db = None, None
-        if mongo_endpoint and db_name:
+        if mongo_endpoint is not None and db_name is not None:
             self.client = AsyncIOMotorClient(mongo_endpoint)
             self.db = self.client[db_name]
             logger.info(f"Connected to MongoDB! Current database: {self.db.name}")
@@ -58,18 +62,21 @@ class MgClient:
         Returns:
             Whether the log operation was successful
         """
-        if not self.db:
-            return False
-        ctx = args[0]
-        command_type = 'search'
-        if 'delete' in command.__name__:
-            command_type = 'delete'
-        if 'remove' in command.__name__:
-            command_type = 'remove'
-        for key, val in kwargs.items():
-            kwargs[key] = repr(val)
-        command_info = utils.command_to_mongo_dict(command_type, ctx, kwargs)
         try:
+            if self.db is None:
+                print("db is empty!!")
+                return False
+            print("Received Log request!!", end=" ")
+            print(command.__name__)
+            ctx = args[0]
+            command_type = 'search'
+            if 'delete' in command.__name__:
+                command_type = 'delete'
+            if 'remove' in command.__name__:
+                command_type = 'remove'
+            for key, val in kwargs.items():
+                kwargs[key] = repr(val)
+            command_info = utils.command_to_mongo_dict(command_type, ctx, kwargs)
             command_coll = self.db.commands
             res = await command_coll.insert_one(command_info)
             if res.acknowledged:
@@ -77,8 +84,8 @@ class MgClient:
             else:
                 logger.error(f"Failed to insert new command {ctx.id}")
             return res.acknowledged
-        except Exception as e:
-            print(e)
+        except:
+            traceback.print_exc()
             return False
 
     async def add_server(self, server: discord.Guild or discord.DMChannel) -> bool:

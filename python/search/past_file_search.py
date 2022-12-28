@@ -78,12 +78,17 @@ class PastFileSearch(AsyncSearchClient):
         filepath = self.construct_index_file_path(onii_chan)
         if not os.path.exists(filepath):
             buffer = {filepath: []}
+            channel_file_set = set()
             async for file_attachments in self.channel_index(onii_chan):
                 for file in file_attachments:
+                    if file['objectID'] in channel_file_set:
+                        continue
+                    channel_file_set.add(file['objectID'])
                     existing_files = buffer.get(filepath, [])
                     if len(existing_files) >= self.write_buffer_size:
                         await self.create_doc(filepath_to_metadata=buffer)
                         buffer[filepath] = []
+                        channel_file_set = set()
                     existing_files.append(file)
                     buffer[filepath] = existing_files
             await self.create_doc(filepath_to_metadata=buffer)
@@ -162,14 +167,16 @@ class PastFileSearch(AsyncSearchClient):
         if not os.path.exists(filepath):
             return []
         files = []
+        files_set = set()
         async with aiofiles.open(filepath, 'r') as f:
             async for md in f:
                 metadata = json.loads(md)
-                if metadata['objectID'] in self.banned_file_ids:
+                if metadata['objectID'] in self.banned_file_ids or metadata['objectID'] in files_set:
                     continue
                 if self.search_dict_match(metadata=metadata, **query):
                     files.append(metadata)
-        return files
+                    files_set.add(metadata['objectID'])
+        return files, files_set
 
     async def search(self, interaction: discord.Interaction, onii_chans: List[Union[discord.DMChannel, discord.Guild]], bot_user=None, **query) -> List[Dict]:
         """
@@ -199,7 +206,12 @@ class PastFileSearch(AsyncSearchClient):
         for onii_chan in onii_chans:
             tasks.append(asyncio.ensure_future(self.chan_search(onii_chan, **query)))
         res = await asyncio.gather(*tasks)
-        files = [r for ress in res for r in ress]
+        files = []
+        big_set = set()
+        for file_list, file_set in res:
+            files.extend(file_list)
+            big_set.union(file_set)
+        files = list(filter(lambda file: file['objectID'] not in big_set, files))
 
         if query.get('filename'):
             return sorted(files, reverse=True, key=lambda x: fuzz.ratio(query['filename'], x['filename']))

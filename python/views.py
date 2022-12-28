@@ -7,13 +7,13 @@ class FileDropDown(discord.ui.Select):
     def __init__(self, files):
         self.value_to_name = {self.build_select_value(file): file['filename'] for file in files}
 
-        options = self.produce_options(files=files)
+        options = self.produce_options()
         super().__init__(placeholder="Choose your files here!", options=options)
 
     def build_select_value(self, file: Dict):
         return ','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
 
-    def produce_options(self, files):
+    def produce_options(self):
         options = []
         for value, name in self.value_to_name.items():
             if len(name) >= 100:

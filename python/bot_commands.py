@@ -1,6 +1,6 @@
 """The core functionality of the bot."""
 from search.async_search_client import AsyncSearchClient
-from mongo_client import MgClient
+from database.async_data_client import AsyncDataClient
 from utils import filter_messages_with_permissions
 
 import discord
@@ -9,7 +9,7 @@ from typing import List, Dict
 
 
 async def fremove(interaction: discord.Interaction or commands.Context,
-                  search_client: AsyncSearchClient, mg_client: MgClient, bot: commands.Bot, **kwargs) -> List[str]:
+                  search_client: AsyncSearchClient, mg_client: AsyncDataClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
     Remove files from search and database.
 
@@ -47,7 +47,7 @@ async def fremove(interaction: discord.Interaction or commands.Context,
 
 
 async def fdelete(interaction: discord.Interaction or commands.Context, search_client: AsyncSearchClient,
-                  mg_client: MgClient, bot: commands.Bot, **kwargs) -> List[str]:
+                  mg_client: AsyncDataClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
     Remove files from our storage and delete their corresponding discord messages.
 
