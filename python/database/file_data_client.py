@@ -16,11 +16,12 @@ logger.addHandler(fh)
 
 class FileDataClient(AsyncDataClient):
 
-    def __init__(self, logs_fp: str = "usage", commands_fp: str = "commands.jsonl"):
+    def __init__(self, db_name: str = None, logs_fp: str = "usage", commands_fp: str = "commands.jsonl"):
         self.user = None
+        self.db_name = db_name
         self.logs_fp = logs_fp
         Path(logs_fp).mkdir(exist_ok=True)
-        self.commands_fp = commands_fp
+        self.commands_fp = db_name + "_" + commands_fp
         self.filepath = os.path.join(logs_fp, commands_fp)
 
     async def log_command(self, command_type, *args, **kwargs) -> bool:

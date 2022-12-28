@@ -76,7 +76,6 @@ class Discordfs(commands.Cog):
         """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
-            print("Calling a log command!")
             await self.db_client.log_command(function, *args, **kwargs)
             return await function(self, *args, **kwargs)
         return wrapper
@@ -483,11 +482,12 @@ async def setup(bot):
     Args:
         bot: The discord bot.
     """
-    print(f'In {getattr(CONFIG, "DB_NAME", "normal")} mode')
+    db_name = getattr(CONFIG, "DB_NAME", "normal")
+    print(f'In {db_name} mode')
     # ag_client = AlgoliaClient(getattr(CONFIG, 'ALGOLIA_APP_ID', None), getattr(CONFIG, 'ALGOLIA_SEARCH_KEY', None),
     #                           getattr(CONFIG, 'ALGOLIA_ADMIN_KEY', None))
     # searcher = Searcher(ag_client, PastFileSearch())
     searcher = PastFileSearch()
-    command_client = FileDataClient()
+    command_client = FileDataClient(db_name=db_name)
     sme = SymmetricMessageEncryptor(Fernet, CONFIG)
     await bot.add_cog(Discordfs(guild_ids, bot, searcher, command_client, sme))
