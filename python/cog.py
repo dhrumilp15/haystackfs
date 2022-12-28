@@ -1,4 +1,6 @@
 """Cog class."""
+import traceback
+
 from cryptography.fernet import Fernet
 from functools import wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
@@ -178,18 +180,18 @@ class Discordfs(commands.Cog):
 
         if kwargs.get("channel") and interaction.guild is not None:
             if not kwargs.get("channel").permissions_for(interaction.guild.me).read_message_history:
-                await interaction.send(f"I can't read messages in {kwargs.get('channel').name}! Please give me `read_message_history` permissions for {kwargs.get('channel').name}", hidden=kwargs.get("dm", False))
+                await interaction.send(f"I can't read messages in {kwargs.get('channel').name}! Please give me `read_message_history` permissions for {kwargs.get('channel').name}", ephemeral=kwargs.get("dm", False))
                 return interaction, []
         files = await fsearch(interaction=interaction, search_client=self.search_client, bot=self.bot, **kwargs)
         # TODO: Better Error Handling
         if isinstance(files, str):
-            await interaction.followup.send_message(content=files, hidden=True)
+            await interaction.followup.send(content=files, ephemeral=True)
             return interaction, []
 
         recipient = interaction
         if kwargs.get("dm"):
             recipient = interaction.message.author
-            await interaction.followup.send_message("DM'ing your files...", hidden=True)
+            await interaction.followup.send("DM'ing your files...", ephemeral=True)
 
         return recipient, files
 
@@ -208,12 +210,15 @@ class Discordfs(commands.Cog):
             interaction: The discord.Interaction from which the command originated
             kwargs: Kwargs about a query
         """
-        kwargs = {"filename": filename, "filetype": filetype, "custom_filetype": custom_filetype, "author": author,
-                  "channel": channel, "content": content, "after": after, "before": before, "dm": dm}
-        await interaction.response.defer(ephemeral=kwargs["dm"])
-        recipient, files = await self.locate(interaction, **kwargs)
-        if files:
-            await self.send_files_as_message(recipient, files)
+        try:
+            kwargs = {"filename": filename, "filetype": filetype, "custom_filetype": custom_filetype, "author": author,
+                      "channel": channel, "content": content, "after": after, "before": before, "dm": dm}
+            await interaction.response.defer(ephemeral=kwargs["dm"])
+            recipient, files = await self.locate(interaction, **kwargs)
+            if files:
+                await self.send_files_as_message(recipient, files)
+        except:
+            traceback.print_exc()
 
     @app_commands.command(name="export",
                           description="Get a Python export script to download the files returned in a search to your computer.")
@@ -307,14 +312,14 @@ class Discordfs(commands.Cog):
             ctx: The SlashContext from which the command originated
             filename: A str of the filename to query for.
         """
-        await interaction.response.defer(hidden=True)
+        await interaction.response.defer(ephemeral=True)
         kwargs = {"filename": filename, "filetype":filetype, "custom_filetype": custom_filetype, "author": author,
                   "channel": channel, "content": content, "after": after, "before": before, "dm": dm}
         removed_files = await fremove(interaction, self.search_client, self.db_client, self.bot, **kwargs)
         if isinstance(removed_files, str):
-            await interaction.followup.send(content=removed_files, hidden=True)
+            await interaction.followup.send(content=removed_files, ephemeral=True)
             return
-        await interaction.followup.send(content=f"Removed {' '.join(removed_files)}", hidden=True)
+        await interaction.followup.send(content=f"Removed {' '.join(removed_files)}", ephemeral=True)
 
     @commands.command(name="fsearch", aliases=["fs", "search", "s"], pass_context=True)
     @log_command
