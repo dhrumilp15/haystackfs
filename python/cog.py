@@ -193,7 +193,7 @@ class Discordfs(commands.Cog):
 
         return recipient, files
 
-    @app_commands.command(name="search", description="Epic command")
+    @app_commands.command(name="search", description="Search for your files!")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
     @log_command
