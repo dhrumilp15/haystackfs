@@ -1,25 +1,20 @@
 """The core functionality of the bot."""
 from search.async_search_client import AsyncSearchClient
-from mongo_client import MgClient
+from database.async_data_client import AsyncDataClient
 from utils import filter_messages_with_permissions
 
 import discord
 from discord.ext import commands
-from discord_slash import SlashContext
 from typing import List, Dict
 
 
-async def fremove(ctx: SlashContext or commands.Context,
-                  search_client: AsyncSearchClient,
-                  mg_client: MgClient,
-                  bot: commands.Bot,
-                  **kwargs) -> List[str]:
+async def fremove(interaction: discord.Interaction or commands.Context,
+                  search_client: AsyncSearchClient, mg_client: AsyncDataClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
     Remove files from search and database.
 
     Args:
-        ctx: The message's origin
-        filename: The query for files to remove
+        interaction: The message's origin
         search_client: The Search client
         mg_client: The MongoDB client
         bot: The discord bot
@@ -27,19 +22,15 @@ async def fremove(ctx: SlashContext or commands.Context,
     Returns:
         A list of filenames that were deleted
     """
-    author = ctx.author
-    serv_id = ctx.channel
-    if ctx.guild is not None:
-        serv_id = ctx.guild
+    author = interaction.author
+    serv_id = interaction.channel
+    if interaction.guild is not None:
+        serv_id = interaction.guild
 
     files = await search_client.search(serv_id, **kwargs)
 
-    manageable_files = filter_messages_with_permissions(
-        author,
-        files,
-        discord.Permissions(read_message_history=True),
-        bot
-    )
+    manageable_files = filter_messages_with_permissions(author=author, files=files,
+                                                        perm=discord.Permissions(read_message_history=True), bot=bot)
     if not manageable_files:
         return f"I couldn't find any files that you can access."
     res = await search_client.remove_doc(
@@ -55,13 +46,13 @@ async def fremove(ctx: SlashContext or commands.Context,
     return manageable_files
 
 
-async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSearchClient,
-                  mg_client: MgClient, bot: commands.Bot, **kwargs) -> List[str]:
+async def fdelete(interaction: discord.Interaction or commands.Context, search_client: AsyncSearchClient,
+                  mg_client: AsyncDataClient, bot: commands.Bot, **kwargs) -> List[str]:
     """
     Remove files from our storage and delete their corresponding discord messages.
 
     Args:
-        ctx: The message's origin
+        interaction: The message's origin
         filename: The query for files to remove
         search_client: The Search client
         mg_client: The MongoDB client
@@ -70,17 +61,13 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
     Returns:
         A list of filenames that were deleted
     """
-    author = ctx.author
-    serv_id = ctx.channel.id
-    if ctx.guild is not None:
-        serv_id = ctx.guild.id
+    author = interaction.author
+    serv_id = interaction.channel.id
+    if interaction.guild is not None:
+        serv_id = interaction.guild.id
     files = await search_client.search(serv_id, **kwargs)
-    manageable_files = filter_messages_with_permissions(
-        author,
-        files,
-        discord.Permissions(read_message_history=True),
-        bot
-    )
+    manageable_files = filter_messages_with_permissions(author=author, files=files,
+                                                        perm=discord.Permissions(read_message_history=True), bot=bot)
     if not manageable_files:
         return f"I couldn't find any files that you can access."
     deleted_files = []
@@ -101,7 +88,7 @@ async def fdelete(ctx: SlashContext or commands.Context, search_client: AsyncSea
     return deleted_files
 
 
-async def fsearch(ctx: SlashContext or commands.Context,
+async def fsearch(interaction: discord.Interaction or commands.Context,
                   search_client: AsyncSearchClient,
                   bot: commands.Bot,
                   **kwargs) -> List[Dict]:
@@ -109,7 +96,7 @@ async def fsearch(ctx: SlashContext or commands.Context,
     Find docs related to a query in ElasticSearch.
 
     Args:
-        ctx: The message's origin
+        interaction: The message's origin
         filename: The query
         search_client: The Search client
         bot: The discord bot
@@ -117,15 +104,18 @@ async def fsearch(ctx: SlashContext or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    onii_chan = ctx.channel
-    if ctx.guild is not None:
-        onii_chan = ctx.guild
+    onii_chan = [kwargs['channel']]
+    if onii_chan[0] is None:
+        onii_chan = interaction.channel
+        if interaction.guild is not None:
+            onii_chan = interaction.guild.text_channels
+
     bot_user = None
-    if ctx.guild is not None:
-        bot_user = ctx.guild.me
+    if interaction.guild is not None:
+        bot_user = interaction.guild.me
 
     files = await search_client.search(
-        ctx,
+        interaction,
         onii_chan,
         bot_user=bot_user,
         **kwargs
@@ -133,12 +123,4 @@ async def fsearch(ctx: SlashContext or commands.Context,
     if not files:
         return f"I couldn't find any files related to your query. I may not have the `read_message_history` permission for some channels."
 
-    manageable_files = filter_messages_with_permissions(
-        author=ctx.author,
-        files=files,
-        perm=discord.Permissions(read_message_history=True),
-        bot=bot
-    )
-    if not manageable_files:
-        return f"I couldn't find any files that you can access."
-    return manageable_files
+    return files

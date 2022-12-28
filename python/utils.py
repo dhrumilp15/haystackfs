@@ -1,14 +1,11 @@
 """Commonly used utility functions."""
 from typing import List, Dict
 from io import BytesIO
-from discord_slash.context import SlashContext
 import requests
 import discord
 from discord.ext.commands import Bot
 from datetime import datetime
-import mongo_client as MgClient  # cyclic dependency
-from discord_slash.model import SlashCommandOptionType
-from discord_slash.utils.manage_commands import create_option
+from database.mongo_client import MgClient
 
 CONTENT_TYPE_CHOICES = sorted([
     {"name": "mp4", "value": "video/mp4"},
@@ -20,70 +17,70 @@ CONTENT_TYPE_CHOICES = sorted([
     {"name": "audio", "value": "audio"},
     {"name": "zip", "value": "application/zip"},
     {"name": "mp3/m4a", "value": "audio/mpeg"},
-
 ], key=lambda x: x['name'])
+CONTENT_TYPE_CHOICES = list(map(lambda opt: discord.app_commands.Choice(**opt), CONTENT_TYPE_CHOICES))
 
-dm_option = create_option(
-    name="dm",
-    description="If `True`, I'll dm you what I find. \
-                Otherwise, I'll send it to this channel",
-    option_type=SlashCommandOptionType.BOOLEAN,
-    required=False)
+dm_option = {
+    "name":"dm",
+    "description":"If `True`, I'll dm you what I find. Otherwise, I'll send it to this channel",
+    "option_type": discord.AppCommandOptionType.boolean,
+    "required": False
+}
 
 search_options = [
-    create_option(
-        name="filename",
-        description="Even a partial name of your file will do :)",
-        option_type=SlashCommandOptionType.STRING,
-        required=False,
-    ),
-    create_option(
-        name="filetype",
-        description="You can choose a filetype here. Use `custom filetype` to specify a different one",
-        option_type=SlashCommandOptionType.STRING,
-        required=False,
-        choices=CONTENT_TYPE_CHOICES
-    ),
-    create_option(
-        name="custom_filetype",
-        description="Searches for files of a custom file type",
-        option_type=SlashCommandOptionType.STRING,
-        required=False,
-    ),
-    create_option(
-        name="author",
-        description="Searches for files uploaded by a user",
-        option_type=SlashCommandOptionType.USER,
-        required=False
-    ),
-    create_option(
-        name="channel",
-        description="Searches for files in a channel",
-        option_type=SlashCommandOptionType.CHANNEL,
-        required=False
-    ),
-    create_option(
-        name="content",
-        description="Search for files in messages by message content",
-        option_type=SlashCommandOptionType.STRING,
-        required=False
-    ),
-    create_option(
-        name="after",
-        description="Search for files after a date. \
-                Use the `before` option to specify a range of dates",
-        option_type=SlashCommandOptionType.STRING,
-        required=False
-    ),
-    create_option(
-        name="before",
-        description="Search for files before a date. \
-                Use the `after` option to specify a range of dates",
-        option_type=SlashCommandOptionType.STRING,
-        required=False
-    ),
+    {
+        "name":"filename",
+        "description":"Even a partial name of your file will do :)",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False,
+},
+{
+        "name":"filetype",
+        "description":"You can choose a filetype here. Use `custom filetype` to specify a different one",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False,
+        "choices":CONTENT_TYPE_CHOICES
+},
+{
+        "name":"custom_filetype",
+        "description":"Searches for files of a custom file type",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False,
+},
+{
+        "name":"author",
+        "description":"Searches for files uploaded by a user",
+        "option_type":discord.AppCommandOptionType.user,
+        "required":False
+},
+{
+        "name":"channel",
+        "description":"Searches for files in a channel",
+        "option_type":discord.AppCommandOptionType.channel,
+        "required":False
+},
+{
+        "name":"content",
+        "description":"Search for files in messages by message content",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False
+},
+{
+        "name":"after",
+        "description":"Search for files after a date. Use the `before` option to specify a range of dates",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False
+},
+{
+        "name":"before",
+        "description":"Search for files before a date. Use the `after` option to specify a range of dates",
+        "option_type":discord.AppCommandOptionType.string,
+        "required":False
+},
     dm_option
 ]
+
+search_opts = {opt['name']: opt['description'] for opt in search_options}
 
 
 def filter_messages_with_permissions(author: discord.User, files: List[Dict], perm: discord.Permissions, bot: Bot) -> List[Dict]:
@@ -268,7 +265,7 @@ def attachment_to_mongo_dict(message: discord.Message, file: discord.Attachment)
         "timestamp": datetime.now()}
 
 
-def command_to_mongo_dict(command_type: str, ctx: SlashContext, query: dict) -> Dict:
+def command_to_mongo_dict(command_type: str, interaction: discord.Interaction, query: dict) -> Dict:
     """
     Convert a command to a dict.
 
@@ -278,11 +275,13 @@ def command_to_mongo_dict(command_type: str, ctx: SlashContext, query: dict) -> 
     Returns:
         A dict that summarizes the command.
     """
-    source = ctx.channel.id
-    if ctx.guild is not None:
-        source = ctx.guild.id
+    channel = interaction.channel
+
+    source = channel.id
+    if channel.guild is not None:
+        source = channel.guild.id
     return {
-        "caller": ctx.author.name + '#' + ctx.author.discriminator,
+        "caller": interaction.user.name + '#' + interaction.user.discriminator,
         "query": query,
         "source": source,
         "type": command_type,
