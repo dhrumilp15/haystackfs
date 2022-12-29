@@ -98,6 +98,8 @@ class PastFileSearch(AsyncSearchClient):
             if value is None:
                 continue
             if key == "content" or key == "filename" or key == "custom_filetype":
+                if key == "custom_filetype":
+                    key = "filetype"
                 score = fuzz.partial_ratio(value.lower(), metadata[key].lower())
                 if score < self.thresh:
                     return False

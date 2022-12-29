@@ -188,9 +188,9 @@ class Discordfs(commands.Cog):
             await interaction.followup.send(content=files, ephemeral=True)
             return interaction, []
 
-        recipient = interaction
+        recipient = interaction.followup
         if kwargs.get("dm"):
-            recipient = interaction.message.author
+            recipient = interaction.user
             await interaction.followup.send("DM'ing your files...", ephemeral=True)
 
         return recipient, files
@@ -447,7 +447,7 @@ class Discordfs(commands.Cog):
         """Run a simple cleaner every 24 hours."""
         await self.db_client.clear_message_content()
 
-    async def send_files_as_message(self, interaction: discord.Interaction, files: List[Dict]):
+    async def send_files_as_message(self, recipient, files: List[Dict]):
         """
         Send files as a message to ctx.
 
@@ -477,7 +477,7 @@ class Discordfs(commands.Cog):
         if files[0].get('content_type', None):
             if 'image' in files[0]['content_type']:
                 embed.set_image(url=files[0]['url'])
-        await interaction.followup.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
+        await recipient.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
                                         embed=embed, view=view)
 
 async def setup(bot):
