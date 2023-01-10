@@ -78,7 +78,10 @@ class Discordfs(commands.Cog):
         """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
-            await self.db_client.log_command(function, *args, **kwargs)
+            try:
+                await self.db_client.log_command(function, *args, **kwargs)
+            except:
+                traceback.print_exc()
             return await function(self, *args, **kwargs)
         return wrapper
 

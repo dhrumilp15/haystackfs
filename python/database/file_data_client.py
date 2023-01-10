@@ -4,7 +4,7 @@ import os
 import utils
 import logging
 import aiofiles
-import json
+import msgpack
 from bson import json_util
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger.addHandler(fh)
 
 class FileDataClient(AsyncDataClient):
 
-    def __init__(self, db_name: str = None, logs_fp: str = "usage", commands_fp: str = "commands.jsonl"):
+    def __init__(self, db_name: str = None, logs_fp: str = "usage", commands_fp: str = "commands.msgpack"):
         self.user = None
         self.db_name = db_name
         self.logs_fp = logs_fp
@@ -45,11 +45,10 @@ class FileDataClient(AsyncDataClient):
             kwargs[key] = repr(val)
         interaction = args[0]
         command_info = utils.command_to_mongo_dict(command_type, interaction, kwargs)
-        mode = 'w'
+        mode = 'wb'
         if os.path.exists(self.filepath):
-            mode = 'a'
+            mode = 'ab'
         async with aiofiles.open(self.filepath, mode) as f:
-            data = json.dumps(command_info, default=json_util.default)
+            data = msgpack.packb(command_info)
             await f.write(data)
-            await f.write(os.linesep)
         return True
