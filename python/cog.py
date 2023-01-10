@@ -78,7 +78,10 @@ class Discordfs(commands.Cog):
         """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
-            await self.db_client.log_command(function, *args, **kwargs)
+            try:
+                await self.db_client.log_command(function, *args, **kwargs)
+            except:
+                traceback.print_exc()
             return await function(self, *args, **kwargs)
         return wrapper
 
@@ -492,7 +495,8 @@ async def setup(bot):
     # ag_client = AlgoliaClient(getattr(CONFIG, 'ALGOLIA_APP_ID', None), getattr(CONFIG, 'ALGOLIA_SEARCH_KEY', None),
     #                           getattr(CONFIG, 'ALGOLIA_ADMIN_KEY', None))
     # searcher = Searcher(ag_client, PastFileSearch())
-    searcher = PastFileSearch()
+    indices_fp = getattr(CONFIG, "INDICES_FILEPATH", "indices")
+    searcher = PastFileSearch(indices_fp=indices_fp)
     command_client = FileDataClient(db_name=db_name)
     sme = SymmetricMessageEncryptor(Fernet, CONFIG)
     await bot.add_cog(Discordfs(guild_ids, bot, searcher, command_client, sme))

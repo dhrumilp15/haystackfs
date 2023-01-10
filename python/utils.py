@@ -285,5 +285,5 @@ def command_to_mongo_dict(command_type: str, interaction: discord.Interaction, q
         "query": query,
         "source": source,
         "type": command_type,
-        "timestamp": datetime.now(),
+        "timestamp": datetime.now().isoformat(),
     }

@@ -4,12 +4,12 @@ import discord
 from typing import List, Dict, Union
 from fuzzywuzzy import fuzz
 from utils import attachment_to_mongo_dict, attachment_to_search_dict
-import json
 from pathlib import Path
 import asyncio
 import aiofiles
 import os
-
+import msgpack
+from dateutil import parser
 
 class PastFileSearch(AsyncSearchClient):
     """Search for files in discord with just discord."""
@@ -28,6 +28,7 @@ class PastFileSearch(AsyncSearchClient):
         self.user = None
         self.indices_fp = indices_fp
         self.write_buffer_size = 50
+        self.ext = ".msgpack"
         Path(indices_fp).mkdir(exist_ok=True)
 
     def initialize(self, bot_user: str, *args, **query) -> bool:
@@ -71,7 +72,7 @@ class PastFileSearch(AsyncSearchClient):
         if onii_chan.guild is not None:
             filepath = os.path.join(str(onii_chan.guild.id), filepath)
         filepath = os.path.join(self.indices_fp, filepath)
-        filepath += ".json"
+        filepath += self.ext
         return filepath
 
     async def channel_index_writer(self, onii_chan: discord.TextChannel):
@@ -151,6 +152,18 @@ class PastFileSearch(AsyncSearchClient):
 
         await asyncio.gather(*tasks)
 
+    def object_hooky(self, item):
+        item_dict = {}
+        for key, value in item.items():
+            new_key = key.decode()
+            if new_key == "created_at":
+                value = parser.parse(value.decode())
+            else:
+                if isinstance(value, bytes):
+                    value = value.decode()
+            item_dict[new_key] = value
+        return item_dict
+
     async def chan_search(self, onii_chan: discord.TextChannel, **query) -> List[Dict]:
         """
         Search a channel index for a query.
@@ -170,9 +183,9 @@ class PastFileSearch(AsyncSearchClient):
             return []
         files = []
         files_set = set()
-        async with aiofiles.open(filepath, 'r') as f:
-            async for md in f:
-                metadata = json.loads(md)
+        with open(filepath, 'rb') as f:
+            unpacker = msgpack.Unpacker(f, object_hook=self.object_hooky)
+            for metadata in unpacker:
                 if metadata['objectID'] in self.banned_file_ids or metadata['objectID'] in files_set:
                     continue
                 if self.search_dict_match(metadata=metadata, **query):
@@ -242,14 +255,13 @@ class PastFileSearch(AsyncSearchClient):
             dir_name = os.path.dirname(filepath)
             Path(dir_name).mkdir(exist_ok=True)
             message_attachments = filepath_to_metadata[filepath]
-            mode = 'a'
+            mode = 'ab'
             if not os.path.exists(filepath):
-                mode = 'w'
+                mode = 'wb'
             async with aiofiles.open(filepath, mode=mode) as f:
                 for file in message_attachments:
-                    res = json.dumps(file)
-                    await f.write(res)
-                    await f.write(os.linesep)
+                    packed = msgpack.packb(file)
+                    await f.write(packed)
 
     async def remove_doc(self, file_ids: list, *args, **kwargs):
         """Update banned ids with the file ids."""
