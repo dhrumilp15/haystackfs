@@ -9,7 +9,6 @@ import asyncio
 import aiofiles
 import os
 import msgpack
-from bson import json_util
 from dateutil import parser
 
 class PastFileSearch(AsyncSearchClient):

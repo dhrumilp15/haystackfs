@@ -5,7 +5,7 @@ import utils
 import logging
 import aiofiles
 import msgpack
-from bson import json_util
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
