@@ -152,18 +152,6 @@ class PastFileSearch(AsyncSearchClient):
 
         await asyncio.gather(*tasks)
 
-    def object_hooky(self, item):
-        item_dict = {}
-        for key, value in item.items():
-            new_key = key.decode()
-            if new_key == "created_at":
-                value = parser.parse(value.decode())
-            else:
-                if isinstance(value, bytes):
-                    value = value.decode()
-            item_dict[new_key] = value
-        return item_dict
-
     async def chan_search(self, onii_chan: discord.TextChannel, **query) -> List[Dict]:
         """
         Search a channel index for a query.
@@ -184,7 +172,7 @@ class PastFileSearch(AsyncSearchClient):
         files = []
         files_set = set()
         with open(filepath, 'rb') as f:
-            unpacker = msgpack.Unpacker(f, object_hook=self.object_hooky)
+            unpacker = msgpack.Unpacker(f)
             for metadata in unpacker:
                 if metadata['objectID'] in self.banned_file_ids or metadata['objectID'] in files_set:
                     continue
