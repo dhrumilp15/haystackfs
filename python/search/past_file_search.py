@@ -9,7 +9,7 @@ import asyncio
 import aiofiles
 import os
 import msgpack
-from dateutil import parser
+from search.search_utils import search_dict_match
 
 class PastFileSearch(AsyncSearchClient):
     """Search for files in discord with just discord."""
@@ -94,42 +94,6 @@ class PastFileSearch(AsyncSearchClient):
                     buffer[filepath] = existing_files
             await self.create_doc(filepath_to_metadata=buffer)
 
-    def search_dict_match(self, metadata, **query):
-        for key, value in query.items():
-            if value is None:
-                continue
-            if key == "content" or key == "filename" or key == "custom_filetype":
-                if key == "custom_filetype":
-                    key = "filetype"
-                score = fuzz.partial_ratio(value.lower(), metadata[key].lower())
-                if score < self.thresh:
-                    return False
-            elif key == "after":
-                if metadata['created_at'] < value:
-                    return False
-            elif key == "before":
-                if metadata['created_at'] > value:
-                    return False
-            elif key == "author" or key == "channel":
-                if metadata[key + "_id"] != value:
-                    return False
-            elif key == "filetype":
-                filetype = metadata['content_type']
-                if filetype is None:
-                    value = value[value.index('/') + 1:]
-                    filetype = metadata['filetype']
-                if filetype == "jpeg" or filetype == "jpg":
-                    filetype = "jpg"
-                if value == "jpeg" or value == "jpg":
-                    value = "jpg"
-                if value == 'image' or value == 'audio':
-                    if value not in filetype:
-                        return False
-                else:
-                    if value != filetype:
-                        return False
-        return True
-
     async def load_index(self, interaction: discord.Interaction, onii_chans: List[discord.TextChannel]):
         """
         Builds indices for the target channels if needed
@@ -176,7 +140,7 @@ class PastFileSearch(AsyncSearchClient):
             for metadata in unpacker:
                 if metadata['objectID'] in self.banned_file_ids or metadata['objectID'] in files_set:
                     continue
-                if self.search_dict_match(metadata=metadata, **query):
+                if search_dict_match(metadata=metadata, thresh=self.thresh, **query):
                     files.append(metadata)
                     files_set.add(metadata['objectID'])
         return files, files_set

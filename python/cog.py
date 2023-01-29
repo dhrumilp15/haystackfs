@@ -5,7 +5,7 @@ from cryptography.fernet import Fernet
 from functools import wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from search.async_search_client import AsyncSearchClient
-from search.past_file_search import PastFileSearch
+from search.discord_searcher import DiscordSearcher
 from database.async_data_client import AsyncDataClient
 from database.file_data_client import FileDataClient
 from config import CONFIG
@@ -37,7 +37,7 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 
-class Discordfs(commands.Cog):
+class Haystackfs(commands.Cog):
     """Main class for the bot."""
 
     def __init__(self, guild_ids: List, bot,
@@ -492,11 +492,9 @@ async def setup(bot):
     """
     db_name = getattr(CONFIG, "DB_NAME", "normal")
     print(f'In {db_name} mode')
-    # ag_client = AlgoliaClient(getattr(CONFIG, 'ALGOLIA_APP_ID', None), getattr(CONFIG, 'ALGOLIA_SEARCH_KEY', None),
-    #                           getattr(CONFIG, 'ALGOLIA_ADMIN_KEY', None))
     # searcher = Searcher(ag_client, PastFileSearch())
-    indices_fp = getattr(CONFIG, "INDICES_FILEPATH", "indices")
-    searcher = PastFileSearch(indices_fp=indices_fp)
+    # indices_fp = getattr(CONFIG, "INDICES_FILEPATH", "indices")
+    searcher = DiscordSearcher()
     command_client = FileDataClient(db_name=db_name)
     sme = SymmetricMessageEncryptor(Fernet, CONFIG)
-    await bot.add_cog(Discordfs(guild_ids, bot, searcher, command_client, sme))
+    await bot.add_cog(Haystackfs(guild_ids, bot, searcher, command_client, sme))
