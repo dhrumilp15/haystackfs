@@ -32,7 +32,7 @@ class FileDropDown(discord.ui.Select):
         if interaction.guild is not None:
             jump_url = f"https://discord.com/channels/{interaction.guild.id}/{channel_id}/{message_id}"
             media_url = f"https://cdn.discordapp.com/attachments/{channel_id}/{file_id}/{name}"
-        embed.set_field_at(index=0, name=name, value=jump_url)
+        embed.set_field_at(index=0, name=name[:256], value=jump_url)
         embed.set_image(url=media_url)
         await interaction.response.edit_message(embed=embed)
 

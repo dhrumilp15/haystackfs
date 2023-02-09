@@ -1,4 +1,5 @@
 from fuzzywuzzy import fuzz
+from datetime import datetime
 
 def search_dict_match(metadata, thresh=0.75, **query):
     for key, value in query.items():
@@ -11,10 +12,14 @@ def search_dict_match(metadata, thresh=0.75, **query):
             if score < thresh:
                 return False
         elif key == "after":
-            if metadata['created_at'] < value:
+            created_at = datetime.fromisoformat(metadata['created_at'])
+            created_at = created_at.replace(tzinfo=None)
+            if created_at < value:
                 return False
         elif key == "before":
-            if metadata['created_at'] > value:
+            created_at = datetime.fromisoformat(metadata['created_at'])
+            created_at = created_at.replace(tzinfo=None)
+            if created_at > value:
                 return False
         elif key == "author" or key == "channel":
             if metadata[key + "_id"] != value.id:
