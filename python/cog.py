@@ -468,7 +468,7 @@ class Haystackfs(commands.Cog):
                               color=discord.Colour.teal())
         embed.set_footer(text=f"Delivered by {name}, a better file manager for discord.",
                          icon_url=avatar_url)
-        filename = files[0].get('filename')
+        filename = files[0].get('filename')[:100]
         mediaUrl = files[0].get('jump_url')
 
         if not mediaUrl:
@@ -480,8 +480,10 @@ class Haystackfs(commands.Cog):
         if files[0].get('content_type', None):
             if 'image' in files[0]['content_type']:
                 embed.set_image(url=files[0]['url'])
-        await recipient.send(f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}",
-                                        embed=embed, view=view)
+        message = f"Found {files[0]['filename']} {'and more...' if len(files) > 1 else ''}"
+        if len(message) > 100:
+            message = message[:96] + '...'
+        await recipient.send(message, embed=embed, view=view)
 
 async def setup(bot):
     """
