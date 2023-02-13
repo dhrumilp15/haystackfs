@@ -39,7 +39,7 @@ class FileDropDown(discord.ui.Select):
 
 class FileButton(discord.ui.Button):
     def __init__(self, file: Dict):
-        super().__init__(style=discord.ButtonStyle.URL, label=file['filename'], url=file['jump_url'])
+        super().__init__(style=discord.ButtonStyle.url, label=file['filename'][:80], url=file['jump_url'])
 
 # Define a View that will give us our own personal counter button
 class FileView(discord.ui.View):

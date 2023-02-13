@@ -6,6 +6,7 @@ from utils import attachment_to_mongo_dict, attachment_to_search_dict
 from search.search_utils import search_dict_match
 import asyncio
 from fuzzywuzzy import fuzz
+import datetime
 
 
 class DiscordSearcher(AsyncSearchClient):
@@ -34,7 +35,8 @@ class DiscordSearcher(AsyncSearchClient):
         self.user = bot_user
         return True
 
-    async def channel_index(self, channel: discord.TextChannel) -> discord.Message:
+    async def channel_index(self, channel: discord.TextChannel, before: datetime.datetime = None,
+                            after: datetime.datetime = None) -> discord.Message:
         """
         Index a channel's files.
 
@@ -44,7 +46,7 @@ class DiscordSearcher(AsyncSearchClient):
         Yields:
             A list of dicts of file metadata
         """
-        messages = channel.history(limit=None)
+        messages = channel.history(limit=None, before=before, after=after)
         count = 0
         async for message in messages:
             if count == 100:
@@ -70,7 +72,7 @@ class DiscordSearcher(AsyncSearchClient):
 
         files = []
         files_set = set()
-        async for message in self.channel_index(onii_chan):
+        async for message in self.channel_index(onii_chan, before=query["before"], after=query["after"]):
             for metadata in message:
                 if metadata['objectID'] in self.banned_file_ids or metadata['objectID'] in files_set:
                     continue
