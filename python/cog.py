@@ -1,6 +1,4 @@
 """Cog class."""
-import traceback
-
 from cryptography.fernet import Fernet
 from functools import wraps
 from security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
@@ -24,6 +22,8 @@ import io
 import re
 import hashlib
 from views import FileView
+import traceback
+from discord_utils import update_server_count
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -65,6 +65,11 @@ class Haystackfs(commands.Cog):
 
         if ok:
             print("Clients Initialized!")
+        for guild in self.bot.guilds:
+            if guild.id == guild_ids[0].id:
+                self.home_guild = guild
+                break
+        await update_server_count(self.home_guild, len(self.bot.guilds))
 
     def initialize_clients(self, *args, **kwargs) -> bool:
         """Initialize search and db clients."""
@@ -415,6 +420,7 @@ class Haystackfs(commands.Cog):
         Args:
             guild: The discord.Guild that the bot just joined
         """
+        await update_server_count(self.home_guild, len(self.bot.guilds))
         await self.db_client.add_server(guild)
 
     @commands.Cog.listener()
@@ -425,6 +431,7 @@ class Haystackfs(commands.Cog):
         Args:
             guild: The discord.Guild that the bot just joined
         """
+        await update_server_count(self.home_guild, len(self.bot.guilds))
         await self.db_client.remove_server(guild.id)
         await self.db_client.remove_server_docs(guild.id)
         await self.search_client.clear(guild.id)
