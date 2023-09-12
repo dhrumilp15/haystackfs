@@ -11,8 +11,6 @@ testing_files
 production_files
 */*.json
 *.json
-*/*.jsonl
-*.jsonl
 
 indices/*
 usage/
