@@ -5,6 +5,7 @@ import logging
 import aiofiles
 import msgpack
 from .models import Command
+from dataclasses import asdict
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,6 @@ class FileDataClient(AsyncDataClient):
         if os.path.exists(self.filepath):
             mode = 'ab'
         async with aiofiles.open(self.filepath, mode) as f:
-            data = msgpack.packb(command_info)
+            data = msgpack.packb(asdict(command_info))
             await f.write(data)
         return True
