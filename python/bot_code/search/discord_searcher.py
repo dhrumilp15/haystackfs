@@ -3,12 +3,11 @@ import discord
 from typing import List, Union
 import asyncio
 from fuzzywuzzy import fuzz
-from .async_search_client import AsyncSearchClient
 from ..models.query import Query
 from .search_models import SearchResults, SearchResult
 
 
-class DiscordSearcher(AsyncSearchClient):
+class DiscordSearcher:
     """Search for files in discord with just discord."""
 
     def __init__(self, thresh: int = 75):
@@ -50,13 +49,12 @@ class DiscordSearcher(AsyncSearchClient):
                         file_set.add(metadata.objectId)
                         files.append(metadata)
 
-    async def search(self, interaction: discord.Interaction, onii_chans: List[Union[discord.DMChannel, discord.Guild]],
+    async def search(self, onii_chans: List[Union[discord.DMChannel, discord.Guild]],
                      bot_user=None, query: Query = None) -> SearchResults:
         """
         Search all channels in a Guild or the provided channel.
 
         Args:
-            ctx: The original context for response
             onii_chans: A list of channels to search
             bot_user: The name of the bot
             query: Search parameters
@@ -79,11 +77,3 @@ class DiscordSearcher(AsyncSearchClient):
         elif query.content:
             files = sorted(files, reverse=True, key=lambda x: fuzz.ratio(query.content, x.content))
         return SearchResults(files=files, channel_date_map=channel_date_map)
-
-    async def create_doc(self, *args, **kwargs):
-        """We don't store any docs in this searcher, so it doesn't matter"""
-        pass
-
-    async def remove_doc(self, file_ids: list, *args, **kwargs):
-        """Update banned ids with the file ids."""
-        pass

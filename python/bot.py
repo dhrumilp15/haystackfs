@@ -88,7 +88,11 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
 if __name__ == "__main__":
     async def main():
         # Sync commands after loading extensions
-        async with bot:
-            await bot.load_extension('bot_code.cog')
-            await bot.start(TOKEN)
+        try:
+            async with bot:
+                await bot.load_extension('bot_code.cog')
+                await bot.start(TOKEN)
+        except:
+            import traceback
+            traceback.print_exc()
     asyncio.run(main(), debug=True)

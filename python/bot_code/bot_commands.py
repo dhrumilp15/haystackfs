@@ -3,12 +3,12 @@ from .models.query import Query
 import discord
 from discord.ext import commands
 from typing import List
-from .search.async_search_client import AsyncSearchClient
 from .search.search_models import SearchResults
+from .search.discord_searcher import DiscordSearcher
 from .messages import NO_FILES_FOUND
 
 
-async def fdelete(interaction: discord.Interaction or commands.Context, search_client: AsyncSearchClient,
+async def fdelete(interaction: discord.Interaction or commands.Context, search_client,
                   bot: commands.Bot, query: Query) -> List[str]:
     """
     Remove files from our storage and delete their corresponding discord messages.
@@ -39,8 +39,7 @@ async def fdelete(interaction: discord.Interaction or commands.Context, search_c
 
 
 async def fsearch(interaction: discord.Interaction or commands.Context,
-                  search_client: AsyncSearchClient,
-                  query: Query) -> SearchResults:
+                  search_client: DiscordSearcher, query: Query) -> SearchResults:
     """
     Find docs related to a query in ElasticSearch.
 
@@ -52,19 +51,15 @@ async def fsearch(interaction: discord.Interaction or commands.Context,
     Returns:
         A list of dicts of viewable files.
     """
-    onii_chan = [query.channel]
-    if query.channel is None:
-        onii_chan = interaction.channel
-        if interaction.guild is not None:
-            onii_chan = interaction.guild.text_channels
-
     bot_user = None
+    onii_chan = [interaction.channel if query.channel is None else query.channel]
     if interaction.guild is not None:
         bot_user = interaction.guild.me
+        if not query.channel:
+            onii_chan = interaction.guild.text_channels
 
     search_results = await search_client.search(
-        interaction,
-        onii_chan,
+        onii_chans=onii_chan,
         bot_user=bot_user,
         query=query
     )

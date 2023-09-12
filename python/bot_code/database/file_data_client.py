@@ -1,4 +1,3 @@
-from .async_data_client import AsyncDataClient
 from pathlib import Path
 import os
 import logging
@@ -16,7 +15,7 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 
-class FileDataClient(AsyncDataClient):
+class FileDataClient:
 
     def __init__(self, db_name: str = None, logs_fp: str = "usage", commands_fp: str = "commands.msgpack"):
         self.user = None

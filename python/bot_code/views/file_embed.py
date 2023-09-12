@@ -17,8 +17,7 @@ class FileEmbed(discord.Embed):
             title=f"Found {len(files.files)} file{'s' if len(files.files) > 1 else ''}",
             color=discord.Colour.teal()
         )
-        super().set_footer(text=f"Delivered by {name}, a better file manager for discord.",
-                           icon_url=avatar_url)
+        super().set_footer(text=f"Delivered by {name}, a better file manager for discord.", icon_url=avatar_url)
         filename = first_file.filename[:100]
         mediaUrl = first_file.jump_url
 

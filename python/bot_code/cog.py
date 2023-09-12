@@ -1,7 +1,5 @@
 """Cog class."""
-from .search import AsyncSearchClient
 from .search.discord_searcher import DiscordSearcher
-from .database.async_data_client import AsyncDataClient
 from .database.file_data_client import FileDataClient
 from .models.query import Query
 from .config import CONFIG
@@ -42,8 +40,8 @@ class Haystackfs(commands.Cog):
     """Main class for the bot."""
 
     def __init__(self, guild_ids: List, bot,
-                 search_client: AsyncSearchClient,
-                 db_client: AsyncDataClient) -> None:
+                 search_client,
+                 db_client) -> None:
         """Instantiate the bot."""
         self.bot = bot
         self.guild_ids = guild_ids
@@ -64,19 +62,17 @@ class Haystackfs(commands.Cog):
             if guild.id == guild_ids[0].id:
                 self.home_guild = guild
                 break
-        await update_server_count(self.home_guild, len(self.bot.guilds))
+        print(f"home guild id: {self.home_guild}")
+        # await update_server_count(self.home_guild, len(self.bot.guilds))
+        # print("updated server count")
 
-    @app_commands.command(
-        name="help",
-        description="A help command",
-    )
+    @app_commands.command(name="help",description="A help command")
     @app_commands.describe(dm="If true, I'll dm results to you.")
     async def slash_help(self, interaction: discord.Interaction, dm: bool = False) -> None:
         """Respond to /help. Display a help command with commands and search options."""
         await interaction.response.defer(ephemeral=dm)
         name = self.bot.user.name
         avatar_url = self.bot.user.display_avatar.url
-
         await interaction.followup.send(embed=HelpEmbed(name=name, avatar_url=avatar_url), ephemeral=dm)
 
     async def locate(self, interaction: discord.Interaction, query: Query) -> Tuple[Union[discord.Interaction, discord.member.Member, discord.user.ClientUser], SearchResults]:
@@ -91,23 +87,18 @@ class Haystackfs(commands.Cog):
         """
         if query.channel and interaction.guild is not None:
             if not query.channel.permissions_for(interaction.guild.me).read_message_history:
-                await interaction.send(
-                    INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name),
-                    ephemeral=query.dm
-                )
                 return interaction, SearchResults(
                     message=INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name)
                 )
-        files = await fsearch(interaction=interaction, search_client=self.search_client, query=query)
+        search_results = await fsearch(interaction=interaction, search_client=self.search_client, query=query)
 
-        if files.message:
-            await interaction.followup.send(content=files.message, ephemeral=True)
-            return interaction, files
+        if search_results.message:
+            return interaction, search_results
         recipient = interaction.followup
         if query.dm:
             recipient = interaction.user
             await interaction.followup.send("DM'ing your files...", ephemeral=True)
-        return recipient, files
+        return recipient, search_results
 
     @app_commands.command(name="search", description="Search for your files!")
     @app_commands.describe(**search_opts)
@@ -131,11 +122,11 @@ class Haystackfs(commands.Cog):
         )
         await self.db_client.log_command(interaction, 'search', query)
 
-        recipient, files = await self.locate(interaction=interaction, query=query)
-        if files.message:
-            await interaction.followup.send(content=files.message, ephemeral=True)
+        recipient, search_results = await self.locate(interaction=interaction, query=query)
+        if search_results.message:
+            await interaction.followup.send(content=search_results.message, ephemeral=dm)
         else:
-            await self.send_files_as_message(recipient, files)
+            await self.send_files_as_message(recipient, search_results)
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -158,8 +149,9 @@ class Haystackfs(commands.Cog):
             dm=dm
         )
         await self.db_client.log_command(interaction, 'export', query)
-        recipient, files = await self.locate(interaction=interaction, query=query)
-        if not files.files:
+        recipient, search_results = await self.locate(interaction=interaction, query=query)
+        if search_results.message:
+            await interaction.followup.send(content=search_results.message, ephemeral=dm)
             return
 
         # So file names are maximally compatible.
@@ -168,7 +160,7 @@ class Haystackfs(commands.Cog):
         # Restrict to channels that the search returns files for. This is so that the
         # script does not leak the full server channel list every export. This mapping
         # is required so the export script can save files in directories named by the channels.
-        needed_ids = set(f.channel_id for f in files.files)
+        needed_ids = set(f.channel_id for f in search_results.files)
         if interaction.guild is None:
             chan = interaction.channel
             channels = {str(chan.id): sanitize(chan, str(chan.id))}
@@ -183,11 +175,11 @@ class Haystackfs(commands.Cog):
 
         # This is so that if one is running multiple exports in a server,
         # they don't get export(1).py etc.
-        unique_suffix = hashlib.sha256(bytes(str(sorted(f.url for f in files.files)), "utf-8")).hexdigest()[:5]
+        unique_suffix = hashlib.sha256(bytes(str(sorted(f.url for f in search_results.files)), "utf-8")).hexdigest()[:5]
         filename = f"export_{guild_name}_{unique_suffix}.py"
-        with io.StringIO(generate_script(guild_name, files.files, channels)) as export_script:
+        with io.StringIO(generate_script(guild_name, search_results.files, channels)) as export_script:
             await recipient.send(
-                f"Found {len(files.files)} file(s). Run this script to download them.",
+                f"Found {len(search_results.files)} file(s). Run this script to download them.",
                 file=discord.File(export_script, filename=filename))
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")

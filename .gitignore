@@ -15,5 +15,7 @@ production_files
 *.jsonl
 
 indices/*
-usage/*
+usage/
 key.txt
+logs/
+*.msgpack
