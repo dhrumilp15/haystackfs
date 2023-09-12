@@ -2,7 +2,7 @@
 from .search.discord_searcher import DiscordSearcher
 from .database.file_data_client import FileDataClient
 from .models.query import Query
-from .config import CONFIG
+from .bot_secrets import GUILD_ID, DB_NAME
 import logging
 import discord
 from discord import app_commands
@@ -25,9 +25,7 @@ from .messages import (
     SEARCH_RESULTS_FOUND
 )
 
-guild_ids = []
-if getattr(CONFIG, "GUILD_ID", None):
-    guild_ids = [discord.Object(id=int(CONFIG.GUILD_ID))]
+guild_ids = [] if not GUILD_ID else [GUILD_ID]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -267,8 +265,7 @@ async def setup(bot):
     Args:
         bot: The discord bot.
     """
-    db_name = getattr(CONFIG, "DB_NAME", "normal")
-    print(f'In {db_name} mode')
+    print(f'In {DB_NAME} mode')
     searcher = DiscordSearcher()
-    command_client = FileDataClient(db_name=db_name)
+    command_client = FileDataClient(db_name=DB_NAME)
     await bot.add_cog(Haystackfs(guild_ids, bot, searcher, command_client))
