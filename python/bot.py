@@ -7,6 +7,7 @@ import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
 from discord.ext.commands import Greedy, Context
+from bot_code.messages import RELOAD_DESCRIPTION
 
 # logging
 dlogger = logging.getLogger('discord')
@@ -26,28 +27,13 @@ bot = commands.Bot(command_prefix='fs!', intents=intents)
 debug_guild = [discord.Object(id=int(CONFIG.GUILD_ID))] if getattr(CONFIG, "GUILD_ID", None) else []
 
 
-@bot.tree.command(
-    name="reload",
-    description="Reloads the cog file. Use this to deploy changes to the bot",
-    guilds=debug_guild
-)
+@bot.tree.command(name="reload", description=RELOAD_DESCRIPTION, guilds=debug_guild)
 @commands.is_owner()
 async def reload(interaction: discord.Interaction):
     """Reload cog if the bot owner requests a reload."""
     appinfo = await bot.application_info()
     print(f"Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
     await interaction.response.send_message('Reloading!')
-    # Reloads the file, updating the Cog class.
-    await bot.reload_extension("cog")
-
-
-@bot.command()
-@commands.is_owner()
-@commands.guild_only()
-async def reload(ctx: Context):
-    """Reload the bot."""
-    appinfo = await bot.application_info()
-    print(f"{bot.user} Reload initiated by {appinfo.owner} at {datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}!")
     # Reloads the file, updating the Cog class.
     await bot.reload_extension("cog")
 
@@ -69,9 +55,7 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
         else:
             synced = await ctx.bot.tree.sync()
 
-        await ctx.send(
-            f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}"
-        )
+        await ctx.send(f"Synced {len(synced)} commands {'globally' if spec is None else 'to the current guild.'}")
         return
 
     ret = 0

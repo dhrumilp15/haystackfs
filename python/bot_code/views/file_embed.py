@@ -1,23 +1,21 @@
-import discord
-from .file_view import FileView
+from .haystack_embed import HaystackEmbed
 from ..search.search_models import SearchResults
 
 
-class FileEmbed(discord.Embed):
+class FileEmbed(HaystackEmbed):
 
-    def __init__(self, files: SearchResults, name: str, avatar_url: str):
+    def __init__(self, search_results: SearchResults, name: str, avatar_url: str):
         """
         Build file search embed.
 
         Returns:
             The help embed
         """
-        first_file = files.files[0]
         super().__init__(
-            title=f"Found {len(files.files)} file{'s' if len(files.files) > 1 else ''}",
-            color=discord.Colour.teal()
+            title=f"Found {len(search_results.files)} file{'s' if len(search_results.files) > 1 else ''}",
+            name=name, avatar_url=avatar_url
         )
-        super().set_footer(text=f"Delivered by {name}, a better file manager for discord.", icon_url=avatar_url)
+        first_file = search_results.files[0]
         filename = first_file.filename[:100]
         mediaUrl = first_file.jump_url
 

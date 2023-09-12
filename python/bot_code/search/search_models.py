@@ -75,9 +75,8 @@ class SearchResult:
                 if value == 'image' or value == 'audio':
                     if value not in filetype:
                         return False
-                else:
-                    if value != filetype:
-                        return False
+                elif value != filetype:
+                    return False
         return True
 
 
