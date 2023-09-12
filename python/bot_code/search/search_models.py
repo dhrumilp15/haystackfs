@@ -68,9 +68,9 @@ class SearchResult:
                 if filetype is None:
                     value = value[value.index('/') + 1:]
                     filetype = self.filetype
-                if filetype == "jpeg" or filetype == "jpg":
+                if filetype == "jpeg":
                     filetype = "jpg"
-                if value == "jpeg" or value == "jpg":
+                if value == "jpeg":
                     value = "jpg"
                 if value == 'image' or value == 'audio':
                     if value not in filetype:

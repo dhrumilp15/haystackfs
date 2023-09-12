@@ -35,7 +35,7 @@ if getattr(CONFIG, "GUILD_ID", None):
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-fh = logging.FileHandler('../../logs/main.log', encoding='utf-8', mode='w')
+fh = logging.FileHandler('../logs/main.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
