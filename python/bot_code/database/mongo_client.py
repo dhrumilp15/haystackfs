@@ -180,7 +180,7 @@ class MgClient:
             Whether the delete operation was acknowledged.
         """
         if not self.db:
-            return False
+            return False, False
         server_coll = self.db.servers
         try:
             inactive_servers = server_coll.find({"bot_in_server": False})

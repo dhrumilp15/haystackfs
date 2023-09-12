@@ -89,10 +89,6 @@ if __name__ == "__main__":
     async def main():
         # Sync commands after loading extensions
         async with bot:
-            try:
-                await bot.load_extension('bot_code.cog')
-                await bot.start(TOKEN)
-            except:
-                import traceback
-                traceback.print_exc()
+            await bot.load_extension('bot_code.cog')
+            await bot.start(TOKEN)
     asyncio.run(main(), debug=True)
