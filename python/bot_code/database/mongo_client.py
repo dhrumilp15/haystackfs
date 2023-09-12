@@ -197,26 +197,6 @@ class MgClient:
         except:
             return False
 
-    async def dump_snapshot(self, collection):
-        """
-        Dump a snapshot of a collection to local fs as a json. We choose json because of its portability.
-
-        Args:
-            collection: A collection from mongodb.
-        """
-        if not self.db:
-            return False
-        try:
-            path = f"{CONFIG.DB_NAME}_{collection.name}"
-            if not os.path.exists(path):
-                os.mkdir(path)
-            coll = {collection.name: [file async for file in collection.find()]}
-            print(f'Snapshot of {CONFIG.DB_NAME}/{collection.name} at {datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}')
-            with open(f"{path}/snapshot_" + datetime.now().strftime("%Y-%m-%dT%H:%M:%S") + ".json", 'w') as f:
-                json.dump(coll, fp=f, default=json_util.default, indent=4)
-        except:
-            pass
-
     async def load_from_snapshot(self, snapshot_path: str) -> bool:
         """
         Load the database from the json snapshot.
@@ -276,7 +256,6 @@ class MgClient:
             inactive_servers = server_coll.find({"bot_in_server": False})
             inactive_serv = [serv['_id'] async for serv in inactive_servers]
             files_coll = self.db.files
-            await self.dump_snapshot(files_coll)
 
             n_docs = await files_coll.count_documents({})
             res = await files_coll.delete_many({"guild_id": {"$in": inactive_serv}})

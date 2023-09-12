@@ -78,7 +78,7 @@ class Haystackfs(commands.Cog):
         """
         @wraps(function)
         async def wrapper(self, *args, **kwargs):
-            await self.db_client.log_command(function, *args, **kwargs)
+
             return await function(self, *args, **kwargs)
         return wrapper
 
@@ -97,9 +97,10 @@ class Haystackfs(commands.Cog):
             interaction: The context from which the command was issued
             dm: Whether to display the command only to the author
         """
+        await interaction.response.defer(ephemeral=dm)
         name = self.bot.user.name
         avatar_url = self.bot.user.display_avatar.url
-        await interaction.response.defer(ephemeral=dm)
+
         await interaction.followup.send(embed=HelpEmbed(name=name, avatar_url=avatar_url), ephemeral=dm)
 
     async def locate(self, interaction: discord.Interaction, query: Query) -> Tuple[Union[discord.Interaction, discord.member.Member, discord.user.ClientUser], SearchResults]:
@@ -159,6 +160,8 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
+        await self.db_client.log_command(query)
+
         recipient, files = await self.locate(interaction=interaction, query=query)
         if files.message:
             await interaction.followup.send(content=files.message, ephemeral=True)
@@ -169,7 +172,6 @@ class Haystackfs(commands.Cog):
                           description="Get a Python export script to download the files returned in a search to your computer.")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
-    @log_command
     async def slash_export(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -187,6 +189,7 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
+        await self.db_client.log_command(query)
         recipient, files = await self.locate(interaction=interaction, query=query)
         if not files.files:
             return
@@ -223,7 +226,6 @@ class Haystackfs(commands.Cog):
                           description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
-    @log_command
     async def slash_delete(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
@@ -241,6 +243,7 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
+        await self.db_client.log_command(query)
         deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
         if isinstance(deleted_files, str):
             await interaction.followup.send(content=deleted_files, ephemeral=True)

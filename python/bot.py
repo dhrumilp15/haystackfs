@@ -11,7 +11,7 @@ from discord.ext.commands import Greedy, Context # or a subclass of yours
 # logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='bot_code/discord.log', encoding='utf-8', mode='w')
+handler = logging.FileHandler(filename='../logs/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
 dlogger.addHandler(handler)

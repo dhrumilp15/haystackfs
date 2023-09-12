@@ -1,12 +1,11 @@
 """Search for files purely in discord."""
-from .async_search_client import AsyncSearchClient
 import discord
 from typing import List, Union
-from ..models.query import Query
 import asyncio
 from fuzzywuzzy import fuzz
+from .async_search_client import AsyncSearchClient
+from ..models.query import Query
 from .search_models import SearchResults, SearchResult
-from time import time
 
 
 class DiscordSearcher(AsyncSearchClient):
