@@ -1,10 +1,10 @@
-from database.async_data_client import AsyncDataClient
+from .async_data_client import AsyncDataClient
 from pathlib import Path
 import os
-import utils
 import logging
 import aiofiles
 import msgpack
+from .models import Command
 
 
 logger = logging.getLogger(__name__)
@@ -13,6 +13,7 @@ formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh = logging.FileHandler('usage.log', encoding='utf-8', mode='w')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
+
 
 class FileDataClient(AsyncDataClient):
 
@@ -44,7 +45,7 @@ class FileDataClient(AsyncDataClient):
         for key, val in kwargs.items():
             kwargs[key] = repr(val)
         interaction = args[0]
-        command_info = utils.command_to_mongo_dict(command_type, interaction, kwargs)
+        command_info = Command.from_discord_interaction(command_type, interaction, kwargs)
         mode = 'wb'
         if os.path.exists(self.filepath):
             mode = 'ab'

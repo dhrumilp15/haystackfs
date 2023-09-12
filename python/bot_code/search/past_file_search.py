@@ -9,7 +9,7 @@ import asyncio
 import aiofiles
 import os
 import msgpack
-from search.search_utils import search_dict_match
+
 
 class PastFileSearch(AsyncSearchClient):
     """Search for files in discord with just discord."""

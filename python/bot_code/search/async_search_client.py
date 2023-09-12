@@ -1,14 +1,10 @@
 """A small abstract class to ensure implementations for basic functions exist."""
 from abc import ABC, abstractmethod
+from .search_models import SearchResults
 
 
 class AsyncSearchClient(ABC):
     """Basic Requirements for any Search Client in this project."""
-
-    @abstractmethod
-    def initialize(self, *args, **kwargs):
-        """Initialize clients."""
-        pass
 
     @abstractmethod
     async def create_doc(self, *args, **kwargs):
@@ -21,6 +17,6 @@ class AsyncSearchClient(ABC):
         pass
 
     @abstractmethod
-    async def search(self, *args, **kwargs):
+    async def search(self, *args, **kwargs) -> SearchResults:
         """Search for a doc in the Search Index."""
         pass

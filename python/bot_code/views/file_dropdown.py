@@ -1,17 +1,17 @@
-from typing import List, Dict
 import discord
+from ..search.search_models import SearchResults, SearchResult
 
-# Define a simple View that gives us a counter button
+
 class FileDropDown(discord.ui.Select):
 
-    def __init__(self, files):
-        self.value_to_name = {self.build_select_value(file): file['filename'] for file in files}
+    def __init__(self, files: SearchResults):
+        self.value_to_name = {self.build_select_value(file): file.filename for file in files.files}
 
         options = self.produce_options()
         super().__init__(placeholder="Choose your files here!", options=options)
 
-    def build_select_value(self, file: Dict):
-        return ','.join(map(str, [file['channel_id'], file['message_id'], file['objectID']]))
+    def build_select_value(self, file: SearchResult):
+        return ','.join(map(str, [file.channel_id, file.message_id, file.objectId]))
 
     def produce_options(self):
         options = []
@@ -35,18 +35,3 @@ class FileDropDown(discord.ui.Select):
         embed.set_field_at(index=0, name=name[:256], value=jump_url)
         embed.set_image(url=media_url)
         await interaction.response.edit_message(embed=embed)
-
-
-class FileButton(discord.ui.Button):
-    def __init__(self, file: Dict):
-        super().__init__(style=discord.ButtonStyle.url, label=file['filename'][:80], url=file['jump_url'])
-
-# Define a View that will give us our own personal counter button
-class FileView(discord.ui.View):
-    def __init__(self, files: List[Dict]):
-        super().__init__()
-        if len(files) <= 5:
-            for file in files:
-                self.add_item(FileButton(file))
-        else:
-            self.add_item(FileDropDown(files))

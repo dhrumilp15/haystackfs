@@ -1,22 +1,17 @@
 """Main Bot Controller."""
-import traceback
-
-from config import CONFIG
+from bot_code.config import CONFIG
 import logging
-from discord.ext import commands
-from discord import app_commands
 import discord
 from datetime import datetime
 import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
 from discord.ext.commands import Greedy, Context # or a subclass of yours
-import traceback
 
 # logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler = logging.FileHandler(filename='bot_code/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
 dlogger.addHandler(handler)
@@ -28,10 +23,8 @@ if getattr(CONFIG, 'DB_NAME', None) == "testing":
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='fs!', intents=intents)
-# slash = SlashCommand(bot, sync_commands=True)
-
-
 debug_guild = [discord.Object(id=int(CONFIG.GUILD_ID))] if getattr(CONFIG, "GUILD_ID", None) else []
+
 
 @bot.tree.command(
     name="reload",
@@ -96,6 +89,10 @@ if __name__ == "__main__":
     async def main():
         # Sync commands after loading extensions
         async with bot:
-            await bot.load_extension('cog')
-            await bot.start(TOKEN)
-    asyncio.run(main())
+            try:
+                await bot.load_extension('bot_code.cog')
+                await bot.start(TOKEN)
+            except:
+                import traceback
+                traceback.print_exc()
+    asyncio.run(main(), debug=True)

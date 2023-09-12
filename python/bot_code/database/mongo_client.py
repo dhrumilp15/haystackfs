@@ -1,21 +1,18 @@
 """MongoDB Client."""
+import dataclasses
 import logging
-import traceback
-
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
+from datetime import datetime, timedelta
 import discord
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 import json
 
-from config import CONFIG
-import utils
+from ..config import CONFIG
+from models import Command
 import os
 from bson import json_util
 import traceback
 
-# import utils.server_to_mongo_dict as server_to_mongo_dict
-# import utils.attachment_to_mongo_dict as attachment_to_mongo_dict
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
@@ -76,9 +73,10 @@ class MgClient:
                 command_type = 'remove'
             for key, val in kwargs.items():
                 kwargs[key] = repr(val)
-            command_info = utils.command_to_mongo_dict(command_type, ctx, kwargs)
+
+            command_info = Command.from_discord_interaction(command_type, ctx, kwargs)
             command_coll = self.db.commands
-            res = await command_coll.insert_one(command_info)
+            res = await command_coll.insert_one(dataclasses.asdict(command_info))
             if res.acknowledged:
                 logger.info(f"Inserted new command: {res.inserted_id}")
             else:
@@ -86,34 +84,6 @@ class MgClient:
             return res.acknowledged
         except:
             traceback.print_exc()
-            return False
-
-    async def add_server(self, server: discord.Guild or discord.DMChannel) -> bool:
-        """
-        Add a server or channel to the `servers` collection.
-
-        Args:
-            server: The server or DMChannel to add to the collection
-
-        Returns:
-            Whether the insert operation was successful
-        """
-        if not self.db:
-            return False
-        server_coll = self.db.servers
-        # We've already added the server
-        server_info = utils.server_to_mongo_dict(server)
-        try:
-            num_docs = await server_coll.count_documents({"_id": server.id}, limit=1)
-            if num_docs:
-                return True
-            res = await server_coll.insert_one(server_info)
-            if res.acknowledged:
-                logger.info(f"Inserted new server: {res.inserted_id} with server id: {server.id}")
-            else:
-                logger.error(f"Failed to insert new server with server _id: {server.id}")
-            return res.acknowledged
-        except:
             return False
 
     async def clear_message_content(self) -> bool:
@@ -126,7 +96,7 @@ class MgClient:
         if not self.db:
             return False
         files_coll = self.db.files
-        current_time = datetime.now() - datetime.timedelta(days=29)
+        current_time = datetime.now() - timedelta(days=29)
         await files_coll.update_many({"timestamp": {"$lt": current_time}},
                                      {"$set": {"content": "REMOVED AFTER 30 DAYS"}})
 
@@ -135,7 +105,7 @@ class MgClient:
         Mark the bot as not in this server.
 
         Args:
-            guild: The guild to remove the bot from.
+            server_id: The guild to remove the bot from.
 
         Returns:
             Whether the remove operation was successful.
@@ -158,7 +128,7 @@ class MgClient:
         Remove any docs from a server.
 
         Args:
-            guild: The guild to remove docs from.
+            server_id: The guild to remove docs from.
 
         Returns:
             Whether the remove operation was successful.
@@ -318,14 +288,3 @@ class MgClient:
         except:
             return False, False
 
-
-async def basic_tests():
-    """Run Basic tests."""
-    mg = MgClient()
-    # await mg.add_file()
-    # await mg.add_server()
-
-if __name__ == '__main__':
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(basic_tests())
