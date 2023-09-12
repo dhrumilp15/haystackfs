@@ -5,7 +5,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timedelta
 import discord
 from typing import Tuple
-from models import Command, Attachment
+from .models.command import Command
+from .models.attachment import Attachment
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class MgClient:
         res = await self.db.files.find_one({"_id": int(file_id)}, {"url": 1, "filename": 1})
         return res
 
-    async def log_command(self, command, *args, **kwargs) -> bool:
+    async def log_command(self, interaction, command_type, query) -> bool:
         """
         Log commands to the database.
 
@@ -54,32 +55,16 @@ class MgClient:
         Returns:
             Whether the log operation was successful
         """
-        try:
-            if self.db is None:
-                print("db is empty!!")
-                return False
-            print("Received Log request!!", end=" ")
-            print(command.__name__)
-            ctx = args[0]
-            command_type = 'search'
-            if 'delete' in command.__name__:
-                command_type = 'delete'
-            if 'remove' in command.__name__:
-                command_type = 'remove'
-            for key, val in kwargs.items():
-                kwargs[key] = repr(val)
-
-            command_info = Command.from_discord_interaction(command_type, ctx, kwargs)
-            command_coll = self.db.commands
-            res = await command_coll.insert_one(asdict(command_info))
-            if res.acknowledged:
-                logger.info(f"Inserted new command: {res.inserted_id}")
-            else:
-                logger.error(f"Failed to insert new command {ctx.id}")
-            return res.acknowledged
-        except:
-            traceback.print_exc()
+        if self.db is None:
             return False
+        command_info = Command.from_discord_interaction(command_type, interaction, query)
+        command_coll = self.db.commands
+        res = await command_coll.insert_one(asdict(command_info))
+        if res.acknowledged:
+            logger.info(f"Inserted new command: {res.inserted_id}")
+        else:
+            logger.error(f"Failed to insert new command {ctx.id}")
+        return res.acknowledged
 
     async def clear_message_content(self) -> bool:
         """

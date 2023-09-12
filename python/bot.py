@@ -3,10 +3,12 @@ from bot_code.config import CONFIG
 import logging
 import discord
 from datetime import datetime
+import os
+os.environ['PYTHONASYNCIODEBUG'] = '1'
 import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
-from discord.ext.commands import Greedy, Context # or a subclass of yours
+from discord.ext.commands import Greedy, Context
 
 # logging
 dlogger = logging.getLogger('discord')

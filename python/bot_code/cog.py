@@ -70,18 +70,6 @@ class Haystackfs(commands.Cog):
                 break
         await update_server_count(self.home_guild, len(self.bot.guilds))
 
-    def log_command(function):
-        """
-        Log commands from the given function.
-
-        To be used with search, delete and remove functions.
-        """
-        @wraps(function)
-        async def wrapper(self, *args, **kwargs):
-
-            return await function(self, *args, **kwargs)
-        return wrapper
-
     @app_commands.command(
         name="help",
         description="A help command",
@@ -89,7 +77,7 @@ class Haystackfs(commands.Cog):
         # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @app_commands.describe(dm="If true, I'll dm results to you.")
-    async def slash_help(self, interaction: discord.Interaction, dm: bool=False) -> None:
+    async def slash_help(self, interaction: discord.Interaction, dm: bool = False) -> None:
         """
         Responds to /help. Displays a help command with commands and search options.
 
@@ -109,6 +97,7 @@ class Haystackfs(commands.Cog):
 
         Args:
             interaction: The SlashContext from which the command originated
+            query: The user query
 
         Returns a destination that has a .send method, and a list of files.
         """
@@ -130,7 +119,7 @@ class Haystackfs(commands.Cog):
                 await interaction.send(f"I can't read messages in {query.channel.name}! Please give me `read_message_history` permissions for {query.channel.name}", ephemeral=query.dm)
                 return interaction, SearchResults(message=f"I can't read messages in {query.channel.name}! Please give me `read_message_history` permissions for {query.channel.name}")
         files = await fsearch(interaction=interaction, search_client=self.search_client, query=query)
-        # TODO: Better Error Handling
+
         if files.message:
             await interaction.followup.send(content=files.message, ephemeral=True)
             return interaction, files
@@ -160,7 +149,7 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(query)
+        await self.db_client.log_command(interaction, 'search', query)
 
         recipient, files = await self.locate(interaction=interaction, query=query)
         if files.message:
@@ -189,7 +178,7 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(query)
+        await self.db_client.log_command(interaction, 'export', query)
         recipient, files = await self.locate(interaction=interaction, query=query)
         if not files.files:
             return
@@ -243,7 +232,7 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(query)
+        await self.db_client.log_command(interaction, 'delete', query)
         deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
         if isinstance(deleted_files, str):
             await interaction.followup.send(content=deleted_files, ephemeral=True)

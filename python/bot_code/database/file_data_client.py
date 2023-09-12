@@ -4,14 +4,14 @@ import os
 import logging
 import aiofiles
 import msgpack
-from .models import Command
+from .models.command import Command
 from dataclasses import asdict
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-fh = logging.FileHandler('usage.log', encoding='utf-8', mode='w')
+fh = logging.FileHandler('../logs/usage.log', encoding='utf-8', mode='w')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
@@ -26,7 +26,7 @@ class FileDataClient(AsyncDataClient):
         self.commands_fp = db_name + "_" + commands_fp
         self.filepath = os.path.join(logs_fp, commands_fp)
 
-    async def log_command(self, command_type, *args, **kwargs) -> bool:
+    async def log_command(self, interaction, command_type, query) -> bool:
         """
         Log commands to the database.
 
@@ -38,15 +38,10 @@ class FileDataClient(AsyncDataClient):
         Returns:
             Whether the log operation was successful
         """
-        commands = ['search', 'delete', 'remove', 'export']
-        for command in commands:
-            if command in command_type.__name__:
-                command_type = command
-                break
-        for key, val in kwargs.items():
-            kwargs[key] = repr(val)
-        interaction = args[0]
-        command_info = Command.from_discord_interaction(command_type, interaction, kwargs)
+        commands = ['search', 'delete', 'export']
+        if all([command not in command_type for command in commands]):
+            return False
+        command_info = Command.from_discord_interaction(command_type, interaction, query)
         mode = 'wb'
         if os.path.exists(self.filepath):
             mode = 'ab'
