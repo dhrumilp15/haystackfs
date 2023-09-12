@@ -14,8 +14,6 @@ from discord.ext import commands, tasks
 from .utils import search_opts, CONTENT_TYPE_CHOICES
 from .bot_commands import fdelete, fsearch
 from .export_template import generate_script
-import datetime
-from dateutil import parser
 import glob
 from typing import List, Tuple, Union
 import io
@@ -26,6 +24,10 @@ from .views.help_view import HelpEmbed
 from .views.file_embed import FileEmbed
 from .discord_utils import update_server_count
 from .search.search_models import SearchResults
+from .messages import (
+    INSUFFICIENT_BOT_PERMISSIONS,
+    EXPORT_COMMAND_DESCRIPTION
+)
 
 guild_ids = []
 if getattr(CONFIG, "GUILD_ID", None):
@@ -33,7 +35,7 @@ if getattr(CONFIG, "GUILD_ID", None):
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-fh = logging.FileHandler('main.log', encoding='utf-8', mode='w')
+fh = logging.FileHandler('../../logs/main.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
@@ -72,8 +74,6 @@ class Haystackfs(commands.Cog):
     @app_commands.command(
         name="help",
         description="A help command",
-        # options=[dm_option],
-        # guild_ids=guild_ids if getattr(CONFIG, "DB_NAME", "production") == "testing" else []
     )
     @app_commands.describe(dm="If true, I'll dm results to you.")
     async def slash_help(self, interaction: discord.Interaction, dm: bool = False) -> None:
@@ -100,23 +100,10 @@ class Haystackfs(commands.Cog):
 
         Returns a destination that has a .send method, and a list of files.
         """
-
-        if query.before:
-            before = parser.parse(query.before)
-            before = datetime.datetime(*before.timetuple()[:3])
-            before += datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
-            query.before = before
-
-        if query.after:
-            after = parser.parse(query.after)
-            after = datetime.datetime(*after.timetuple()[:3])
-            after -= datetime.timedelta(microseconds=1)
-            query.after = after
-
         if query.channel and interaction.guild is not None:
             if not query.channel.permissions_for(interaction.guild.me).read_message_history:
-                await interaction.send(f"I can't read messages in {query.channel.name}! Please give me `read_message_history` permissions for {query.channel.name}", ephemeral=query.dm)
-                return interaction, SearchResults(message=f"I can't read messages in {query.channel.name}! Please give me `read_message_history` permissions for {query.channel.name}")
+                await interaction.send(INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name), ephemeral=query.dm)
+                return interaction, SearchResults(message=INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name))
         files = await fsearch(interaction=interaction, search_client=self.search_client, query=query)
 
         if files.message:
@@ -135,7 +122,7 @@ class Haystackfs(commands.Cog):
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
                            after: str = None, before: str = None, dm: bool = False):
-        """Responds to `/search`. Tries to display docs related to a query."""
+        """Responds to `/search`. Tries to display docs that match a query."""
         await interaction.response.defer(ephemeral=dm)
         query = Query(
             filename=filename,
@@ -156,15 +143,14 @@ class Haystackfs(commands.Cog):
         else:
             await self.send_files_as_message(recipient, files)
 
-    @app_commands.command(name="export",
-                          description="Get a Python export script to download the files returned in a search to your computer.")
+    @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
     async def slash_export(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
                            after: str = None, before: str = None, dm: bool = None):
-        """Responds to `/export`. Tries get a download script for all files related to a query."""
+        """Responds to `/export`. Builds a download script for all files matching a query."""
         await interaction.response.defer(ephemeral=dm)
         query = Query(
             filename=filename,
@@ -210,15 +196,14 @@ class Haystackfs(commands.Cog):
                 f"Found {len(files.files)} file(s). Run this script to download them.",
                 file=discord.File(export_script, filename=filename))
 
-    @app_commands.command(name="delete",
-                          description="Delete files AND their respective messages")
+    @app_commands.command(name="delete", description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
     @app_commands.choices(filetype=CONTENT_TYPE_CHOICES)
     async def slash_delete(self, interaction: discord.Interaction, filename: str = None,
                            filetype: str = None, custom_filetype: str = None,
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
                            after: str = None, before: str = None, dm: bool = None):
-        """Responds to `/delete`. Tries to remove docs related to a query and their respective discord messages."""
+        """Respond to `/delete`. Remove docs matching a query and their respective discord messages."""
         await interaction.response.defer(ephemeral=True)
         query = Query(
             filename=filename,
