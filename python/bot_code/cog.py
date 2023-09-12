@@ -29,7 +29,7 @@ guild_ids = [] if not GUILD_ID else [GUILD_ID]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-fh = logging.FileHandler('../logs/main.log', encoding='utf-8', mode='w')
+fh = logging.FileHandler('logs/main.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 fh.setFormatter(formatter)
 logger.addHandler(fh)
