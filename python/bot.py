@@ -37,6 +37,7 @@ async def reload(interaction: discord.Interaction):
     # Reloads the file, updating the Cog class.
     await bot.reload_extension("cog")
 
+
 # umbra's sync command. TYSM!!! <3
 @bot.command()
 @commands.guild_only()
