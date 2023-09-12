@@ -3,17 +3,7 @@ __pycache__
 .vscode
 .idea
 
-*.yaml
-*.rst
 *.log
-
-testing_files
-production_files
-*/*.json
-*.json
-
-indices/*
 usage/
-key.txt
 logs/
 *.msgpack
