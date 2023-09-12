@@ -1,5 +1,6 @@
 import discord
 
+
 async def update_server_count(home_guild: discord.Guild, num_guilds: int):
     if home_guild is None:
         return

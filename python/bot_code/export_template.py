@@ -1,4 +1,6 @@
 from typing import List, Dict
+from dataclasses import asdict
+from .search.search_models import SearchResult
 
 template_top = """#!/usr/bin/env python3.6
 
@@ -66,9 +68,9 @@ for f in files:
 """
 
 
-def generate_script(export_name: str, files: List[Dict], channels: Dict) -> str:
+def generate_script(export_name: str, files: List[SearchResult], channels: Dict) -> str:
     """Generate the contents of a script file."""
-    dict_strs = list(map(lambda d: str(d) + ',', files))
+    dict_strs = list(map(lambda d: str(asdict(d)) + ',', files))
     template_middle = 'files = [\n'
     template_middle += '\n'.join(dict_strs)
     template_middle += ']\n'
