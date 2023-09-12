@@ -77,13 +77,7 @@ class Haystackfs(commands.Cog):
     )
     @app_commands.describe(dm="If true, I'll dm results to you.")
     async def slash_help(self, interaction: discord.Interaction, dm: bool = False) -> None:
-        """
-        Responds to /help. Displays a help command with commands and search options.
-
-        Args:
-            interaction: The context from which the command was issued
-            dm: Whether to display the command only to the author
-        """
+        """Respond to /help. Display a help command with commands and search options."""
         await interaction.response.defer(ephemeral=dm)
         name = self.bot.user.name
         avatar_url = self.bot.user.display_avatar.url
