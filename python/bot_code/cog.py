@@ -21,7 +21,8 @@ from .discord_utils import update_server_count
 from .search.search_models import SearchResults
 from .messages import (
     INSUFFICIENT_BOT_PERMISSIONS,
-    EXPORT_COMMAND_DESCRIPTION
+    EXPORT_COMMAND_DESCRIPTION,
+    SEARCH_RESULTS_FOUND
 )
 
 guild_ids = []
@@ -255,9 +256,7 @@ class Haystackfs(commands.Cog):
         avatar_url = self.bot.user.display_avatar.url
         view = FileView(files)
         embed = FileEmbed(files, name=name, avatar_url=avatar_url)
-        message = f"Found {files.files[0].filename} {'and more...' if len(files.files) > 1 else ''}"
-        if len(message) > 100:
-            message = message[:96] + '...'
+        message = SEARCH_RESULTS_FOUND.format(files.files[0].filename)[:100]
         await recipient.send(message, embed=embed, view=view)
 
 

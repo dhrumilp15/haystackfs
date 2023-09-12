@@ -3,3 +3,4 @@ EXPORT_COMMAND_DESCRIPTION = "Get a Python export script to download the files r
 NO_FILES_FOUND = ("I couldn't find any files related to your query. I may not have the `read_message_history` "
                   "permission for some channels.")
 RELOAD_DESCRIPTION = "Reloads the cog file. Use this to deploy changes to the bot"
+SEARCH_RESULTS_FOUND = "Found {}"

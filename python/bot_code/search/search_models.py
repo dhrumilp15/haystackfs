@@ -79,6 +79,20 @@ class SearchResult:
                     return False
         return True
 
+    def is_image(self):
+        if not self.content_type:
+            return False
+        if 'image' in self.content_type:
+            return True
+        return self.filetype in {'jpg', 'jpeg', 'gif', 'png'}
+
+    def is_audio(self):
+        if not self.content_type:
+            return False
+        if 'audio' in self.content_type:
+            return True
+        return self.filetype in {'wav', 'mp3'}
+
 
 @dataclass
 class SearchResults:

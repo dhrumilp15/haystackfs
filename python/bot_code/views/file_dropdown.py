@@ -15,9 +15,7 @@ class FileDropDown(discord.ui.Select):
     def produce_options(self):
         options = []
         for value, name in self.value_to_name.items():
-            if len(name) >= 100:
-                name = name[:97] + '...'
-            option = discord.SelectOption(label=name, value=value)
+            option = discord.SelectOption(label=name[:100], value=value)
             options.append(option)
         return options
 
