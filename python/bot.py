@@ -12,7 +12,7 @@ from bot_code.messages import RELOAD_DESCRIPTION
 # logging
 dlogger = logging.getLogger('discord')
 dlogger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='../logs/discord.log', encoding='utf-8', mode='w')
+handler = logging.FileHandler(filename='logs/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
 dlogger.addHandler(handler)
