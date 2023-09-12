@@ -1,6 +1,4 @@
 """Cog class."""
-from cryptography.fernet import Fernet
-from .security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from .search import AsyncSearchClient
 from .search.discord_searcher import DiscordSearcher
 from .database.async_data_client import AsyncDataClient
@@ -10,11 +8,10 @@ from .config import CONFIG
 import logging
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
 from .utils import search_opts, CONTENT_TYPE_CHOICES
 from .bot_commands import fdelete, fsearch
 from .export_template import generate_script
-import glob
 from typing import List, Tuple, Union
 import io
 import re
@@ -46,15 +43,13 @@ class Haystackfs(commands.Cog):
 
     def __init__(self, guild_ids: List, bot,
                  search_client: AsyncSearchClient,
-                 db_client: AsyncDataClient,
-                 sme: SymmetricMessageEncryptor) -> None:
+                 db_client: AsyncDataClient) -> None:
         """Instantiate the bot."""
         self.bot = bot
         self.guild_ids = guild_ids
         self.owner = None
         self.search_client = search_client
         self.db_client = db_client
-        self.sme = sme
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -96,8 +91,13 @@ class Haystackfs(commands.Cog):
         """
         if query.channel and interaction.guild is not None:
             if not query.channel.permissions_for(interaction.guild.me).read_message_history:
-                await interaction.send(INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name), ephemeral=query.dm)
-                return interaction, SearchResults(message=INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name))
+                await interaction.send(
+                    INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name),
+                    ephemeral=query.dm
+                )
+                return interaction, SearchResults(
+                    message=INSUFFICIENT_BOT_PERMISSIONS.format(query.channel.name, query.channel.name)
+                )
         files = await fsearch(interaction=interaction, search_client=self.search_client, query=query)
 
         if files.message:
@@ -233,66 +233,23 @@ class Haystackfs(commands.Cog):
         if message.author == self.bot.user:
             return
         # Only track files and servers that have files uploaded to them
-        if message.attachments:
-            message.content = self.sme.encrypt(message.content)
-            await self.search_client.create_doc(message)
-            await self.db_client.add_file(message)
         await self.bot.process_commands(message)
 
     @commands.Cog.listener()
-    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
-        """
-        Remove respective documents from the database when they're deleted.
-
-        Args:
-            payload: A discord.RawMessageDeleteEvent event.
-        """
-        await self.db_client.remove_file([payload.message_id], field="message_id")
+    async def on_guild_join(self):
+        """Log guild joins."""
+        await update_server_count(self.home_guild, len(self.bot.guilds))
 
     @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
-        """
-        Log guild joins.
-
-        Args:
-            guild: The discord.Guild that the bot just joined
-        """
+    async def on_guild_remove(self):
+        """Log guild joins."""
         await update_server_count(self.home_guild, len(self.bot.guilds))
-        await self.db_client.add_server(guild)
-
-    @commands.Cog.listener()
-    async def on_guild_remove(self, guild: discord.Guild):
-        """
-        Log guild joins.
-
-        Args:
-            guild: The discord.Guild that the bot just joined
-        """
-        await update_server_count(self.home_guild, len(self.bot.guilds))
-        await self.db_client.remove_server(guild.id)
-        await self.db_client.remove_server_docs(guild.id)
-        await self.search_client.clear(guild.id)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, e):
         """Command Error Handler."""
         if self.owner:
             await self.owner.send(f"{vars(ctx)}\n{type(e)}\n{e}")
-
-    @tasks.loop(hours=24)
-    async def clear_irrelevant_docs(self):
-        """Run a simple cleaner every 24 hours."""
-        ack, ok = await self.db_client.delete_files_from_inactive_servers()
-        if not ok:
-            logger.error("Deleted every element in the collection, restoring the database now...")
-            snaps = sorted(glob.glob(f"{getattr(CONFIG, 'DB_NAME', 'normal')}_files/*"), reverse=True)[0]
-            await self.db_client.load_from_snapshot(snaps)
-            logger.debug("Database restored!")
-
-    @tasks.loop(hours=24)
-    async def clear_messages(self):
-        """Run a simple cleaner every 24 hours."""
-        await self.db_client.clear_message_content()
 
     async def send_files_as_message(self, recipient, files: SearchResults):
         """
@@ -323,5 +280,4 @@ async def setup(bot):
     print(f'In {db_name} mode')
     searcher = DiscordSearcher()
     command_client = FileDataClient(db_name=db_name)
-    sme = SymmetricMessageEncryptor(Fernet, CONFIG)
-    await bot.add_cog(Haystackfs(guild_ids, bot, searcher, command_client, sme))
+    await bot.add_cog(Haystackfs(guild_ids, bot, searcher, command_client))

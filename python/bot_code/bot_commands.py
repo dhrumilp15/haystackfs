@@ -5,6 +5,7 @@ from discord.ext import commands
 from typing import List
 from .search.async_search_client import AsyncSearchClient
 from .search.search_models import SearchResults
+from .messages import NO_FILES_FOUND
 
 
 async def fdelete(interaction: discord.Interaction or commands.Context, search_client: AsyncSearchClient,
@@ -61,13 +62,12 @@ async def fsearch(interaction: discord.Interaction or commands.Context,
     if interaction.guild is not None:
         bot_user = interaction.guild.me
 
-    files = await search_client.search(
+    search_results = await search_client.search(
         interaction,
         onii_chan,
         bot_user=bot_user,
         query=query
     )
-    if not files.files:
-        return SearchResults(message="I couldn't find any files related to your query. "
-                                     "I may not have the `read_message_history` permission for some channels.")
-    return files
+    if not search_results.files:
+        return SearchResults(message=NO_FILES_FOUND)
+    return search_results
