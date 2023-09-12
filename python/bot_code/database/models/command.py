@@ -15,9 +15,7 @@ class Command:
     def from_discord_interaction(command_type, interaction, query) -> 'Command':
         channel = interaction.channel
 
-        source = channel.id
-        if channel.guild is not None:
-            source = channel.guild.id
+        source = channel.guild.id if channel.guild is not None else channel.id
         return Command(
             caller=interaction.user.name,
             query=query,
