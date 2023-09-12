@@ -68,14 +68,11 @@ class SearchResult:
                 if filetype is None:
                     value = value[value.index('/') + 1:]
                     filetype = self.filetype
-                if filetype == "jpeg":
-                    filetype = "jpg"
-                if value == "jpeg":
-                    value = "jpg"
-                if value == 'image' or value == 'audio':
-                    if value not in filetype:
-                        return False
-                elif value != filetype:
+                if value == 'image' and not self.is_image():
+                    return False
+                if value == 'audio' and not self.is_audio():
+                    return False
+                if value != filetype:
                     return False
         return True
 
@@ -106,4 +103,3 @@ class SearchResults:
         for attachment in message.attachments:
             files.append(SearchResult.from_discord_attachment(message, attachment))
         return SearchResults(files=files)
-
