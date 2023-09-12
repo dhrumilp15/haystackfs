@@ -1,6 +1,5 @@
 """Cog class."""
 from cryptography.fernet import Fernet
-from functools import wraps
 from .security.SymmetricMessageEncryptor import SymmetricMessageEncryptor
 from .search import AsyncSearchClient
 from .search.discord_searcher import DiscordSearcher
