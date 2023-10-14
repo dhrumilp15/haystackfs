@@ -2,7 +2,7 @@
 from python.search.discord_searcher import DiscordSearcher
 from python.database.file_data_client import FileDataClient
 from python.models.query import Query
-from python.bot_secrets import GUILD_ID, DB_NAME
+from python.bot_secrets import DB_NAME
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -29,7 +29,7 @@ class Haystackfs(commands.Cog):
     def __init__(self,
                  bot,
                  search_client,
-                 db_client) -> None:
+                 db_client):
         """Instantiate the bot."""
         self.bot = bot
         self.owner = None
@@ -41,7 +41,6 @@ class Haystackfs(commands.Cog):
         """Occurs when the discord client is ready."""
         appinfo = await self.bot.application_info()
         self.owner = appinfo.owner
-        self.home_guild = self.bot.get_guild(GUILD_ID)
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
         # await update_server_count(self.home_guild, len(self.bot.guilds))
@@ -92,13 +91,12 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(interaction, 'search', query)
-
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
         else:
             await self.send_files_as_message(recipient, search_results)
+        await self.db_client.log_command(interaction, 'search', query)
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)

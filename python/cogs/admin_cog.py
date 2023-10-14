@@ -27,12 +27,6 @@ class AdminCog(commands.Cog):
         """Log guild joins."""
         await update_server_count(self.home_guild, len(self.bot.guilds))
 
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, e):
-        """Command Error Handler."""
-        if self.home_guild:
-            await self.home_guild.send(f"{vars(ctx)}\n{type(e)}\n{e}")
-
 
 def setup(bot):
     return AdminCog(bot)

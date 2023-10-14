@@ -1,5 +1,5 @@
 """Main Bot Controller."""
-from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID
+from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID, ERROR_CHANNEL_ID
 import logging
 import discord
 from datetime import datetime
@@ -11,6 +11,7 @@ from python.messages import RELOAD_DESCRIPTION
 from python.cogs.haystack_cog import setup as haystack_setup
 from python.cogs.admin_cog import setup as admin_setup
 from python.cogs.help_cog import setup as help_setup
+import traceback
 
 # logging
 dlogger = logging.getLogger('discord')
@@ -72,6 +73,16 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
             ret += 1
 
     await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
+
+
+@bot.tree.error
+async def on_command_error(ctx, e):
+    """Command Error Handler."""
+    print("Command error!!")
+    home_guild = bot.get_guild(GUILD_ID)
+    channel = home_guild.get_channel(ERROR_CHANNEL_ID)
+    tb_info = traceback.format_tb(e.original.__traceback__)
+    await channel.send("\n".join(tb_info))
 
 if __name__ == "__main__":
     async def main():
