@@ -5,13 +5,14 @@ async def update_server_count(home_guild: discord.Guild, num_guilds: int):
     if home_guild is None:
         return
     name = f"Server Count: {num_guilds}"
+    category_name = "BOT STATS"
     category = None
     for cat in home_guild.categories:
-        if cat.name == "Bot Stats":
+        if cat.name == category_name:
             category = cat
             break
     if category is None:
-        category = await home_guild.create_category_channel(name="Bot Stats")
+        category = await home_guild.create_category_channel(name=category_name)
         await home_guild.create_voice_channel(name=name, category=category, user_limit=0)
     else:
         channels = category.voice_channels

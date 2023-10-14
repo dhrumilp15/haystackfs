@@ -1,5 +1,5 @@
 """Main Bot Controller."""
-from bot_code.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID
+from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID, ERROR_CHANNEL_ID
 import logging
 import discord
 from datetime import datetime
@@ -7,11 +7,15 @@ import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
 from discord.ext.commands import Greedy, Context
-from bot_code.messages import RELOAD_DESCRIPTION
+from python.messages import RELOAD_DESCRIPTION
+from python.cogs.haystack_cog import setup as haystack_setup
+from python.cogs.admin_cog import setup as admin_setup
+from python.cogs.help_cog import setup as help_setup
+import traceback
 
 # logging
 dlogger = logging.getLogger('discord')
-dlogger.setLevel(logging.DEBUG)
+dlogger.setLevel(logging.ERROR)
 handler = logging.FileHandler(filename='logs/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
@@ -70,10 +74,22 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
 
     await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
 
+
+@bot.tree.error
+async def on_command_error(ctx, e):
+    """Command Error Handler."""
+    print("Command error!!")
+    home_guild = bot.get_guild(GUILD_ID)
+    channel = home_guild.get_channel(ERROR_CHANNEL_ID)
+    tb_info = traceback.format_tb(e.original.__traceback__)
+    await channel.send("".join(tb_info))
+
 if __name__ == "__main__":
     async def main():
         # Sync commands after loading extensions
         async with bot:
-            await bot.load_extension('bot_code.cog')
+            await bot.add_cog(haystack_setup(bot))
+            await bot.add_cog(admin_setup(bot))
+            await bot.add_cog(help_setup(bot))
             await bot.start(TOKEN)
     asyncio.run(main(), debug=True)

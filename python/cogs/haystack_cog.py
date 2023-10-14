@@ -1,49 +1,37 @@
 """Cog class."""
-from .search.discord_searcher import DiscordSearcher
-from .database.file_data_client import FileDataClient
-from .models.query import Query
-from .bot_secrets import GUILD_ID, DB_NAME
-import logging
+from python.search.discord_searcher import DiscordSearcher
+from python.database.file_data_client import FileDataClient
+from python.models.query import Query
+from python.bot_secrets import DB_NAME
 import discord
 from discord import app_commands
 from discord.ext import commands
-from .utils import search_opts, CONTENT_TYPE_CHOICES
-from .bot_commands import fdelete, fsearch
-from .export_template import generate_script
-from typing import List, Tuple, Union
+from python.utils import search_opts, CONTENT_TYPE_CHOICES
+from python.bot_commands import fdelete, fsearch
+from python.export_template import generate_script
+from typing import Tuple, Union
 import io
 import re
 import hashlib
-from .views.file_view import FileView
-from .views.help_view import HelpEmbed
-from .views.file_embed import FileEmbed
-from .discord_utils import update_server_count
-from .search.search_models import SearchResults
-from .messages import (
+from python.views.file_view import FileView
+from python.views.file_embed import FileEmbed
+from python.search.search_models import SearchResults
+from python.messages import (
     INSUFFICIENT_BOT_PERMISSIONS,
     EXPORT_COMMAND_DESCRIPTION,
     SEARCH_RESULTS_FOUND
 )
 
-guild_ids = [] if not GUILD_ID else [GUILD_ID]
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-fh = logging.FileHandler('logs/main.log', encoding='utf-8', mode='w')
-formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-
 
 class Haystackfs(commands.Cog):
     """Main class for the bot."""
 
-    def __init__(self, guild_ids: List, bot,
+    def __init__(self,
+                 bot,
                  search_client,
-                 db_client) -> None:
+                 db_client):
         """Instantiate the bot."""
         self.bot = bot
-        self.guild_ids = guild_ids
         self.owner = None
         self.search_client = search_client
         self.db_client = db_client
@@ -55,24 +43,8 @@ class Haystackfs(commands.Cog):
         self.owner = appinfo.owner
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
-        print(f'Guild ids: {self.guild_ids}')
-
-        for guild in self.bot.guilds:
-            if guild.id == guild_ids[0].id:
-                self.home_guild = guild
-                break
-        print(f"home guild id: {self.home_guild}")
         # await update_server_count(self.home_guild, len(self.bot.guilds))
         # print("updated server count")
-
-    @app_commands.command(name="help",description="A help command")
-    @app_commands.describe(dm="If true, I'll dm results to you.")
-    async def slash_help(self, interaction: discord.Interaction, dm: bool = False) -> None:
-        """Respond to /help. Display a help command with commands and search options."""
-        await interaction.response.defer(ephemeral=dm)
-        name = self.bot.user.name
-        avatar_url = self.bot.user.display_avatar.url
-        await interaction.followup.send(embed=HelpEmbed(name=name, avatar_url=avatar_url), ephemeral=dm)
 
     async def locate(self, interaction: discord.Interaction, query: Query) -> Tuple[Union[discord.Interaction, discord.member.Member, discord.user.ClientUser], SearchResults]:
         """
@@ -119,13 +91,12 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(interaction, 'search', query)
-
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
         else:
             await self.send_files_as_message(recipient, search_results)
+        await self.db_client.log_command(interaction, 'search', query)
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -226,22 +197,6 @@ class Haystackfs(commands.Cog):
         # Only track files and servers that have files uploaded to them
         await self.bot.process_commands(message)
 
-    @commands.Cog.listener()
-    async def on_guild_join(self):
-        """Log guild joins."""
-        await update_server_count(self.home_guild, len(self.bot.guilds))
-
-    @commands.Cog.listener()
-    async def on_guild_remove(self):
-        """Log guild joins."""
-        await update_server_count(self.home_guild, len(self.bot.guilds))
-
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx, e):
-        """Command Error Handler."""
-        if self.owner:
-            await self.owner.send(f"{vars(ctx)}\n{type(e)}\n{e}")
-
     async def send_files_as_message(self, recipient, files: SearchResults):
         """
         Send files as a message to ctx.
@@ -258,7 +213,7 @@ class Haystackfs(commands.Cog):
         await recipient.send(message, embed=embed, view=view)
 
 
-async def setup(bot):
+def setup(bot):
     """
     Set up the bot.
 
@@ -268,4 +223,4 @@ async def setup(bot):
     print(f'In {DB_NAME} mode')
     searcher = DiscordSearcher()
     command_client = FileDataClient(db_name=DB_NAME)
-    await bot.add_cog(Haystackfs(guild_ids, bot, searcher, command_client))
+    return Haystackfs(bot, searcher, command_client)
