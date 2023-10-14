@@ -82,7 +82,7 @@ async def on_command_error(ctx, e):
     home_guild = bot.get_guild(GUILD_ID)
     channel = home_guild.get_channel(ERROR_CHANNEL_ID)
     tb_info = traceback.format_tb(e.original.__traceback__)
-    await channel.send("\n".join(tb_info))
+    await channel.send("".join(tb_info))
 
 if __name__ == "__main__":
     async def main():
