@@ -3,24 +3,24 @@ import discord
 
 
 CONTENT_TYPE_CHOICES = sorted([
-    {"name": "mp4", "value": "video/mp4"},
-    {"name": "gif", "value": "image/gif"},
-    {"name": "jpg/jpeg", "value": "image/jpeg"},
-    {"name": "pdf", "value": "application/pdf"},
-    {"name": "png", "value": "image/png"},
-    {"name": "image", "value": "image"},
-    {"name": "audio", "value": "audio"},
-    {"name": "zip", "value": "application/zip"},
-    {"name": "mp3/m4a", "value": "audio/mpeg"},
+    dict(name="mp4", value="video/mp4"),
+    dict(name="gif", value="image/gif"),
+    dict(name="jpg/jpeg", value="image/jpeg"),
+    dict(name="pdf", value="application/pdf"),
+    dict(name="png", value="image/png"),
+    dict(name="image", value="image"),
+    dict(name="audio", value="audio"),
+    dict(name="zip", value="application/zip"),
+    dict(name="mp3/m4a", value="audio/mpeg"),
 ], key=lambda x: x['name'])
 CONTENT_TYPE_CHOICES = list(map(lambda opt: discord.app_commands.Choice(**opt), CONTENT_TYPE_CHOICES))
 
-dm_option = {
-    "name": "dm",
-    "description": "If `True`, I'll dm you what I find. Otherwise, I'll send it to this channel",
-    "option_type": discord.AppCommandOptionType.boolean,
-    "required": False
-}
+dm_option = dict(
+    name="dm",
+    description="If `True`, I'll dm you what I find. Otherwise, I'll send it to this channel",
+    option_type=discord.AppCommandOptionType.boolean,
+    required=False
+)
 
 search_options = [
     {

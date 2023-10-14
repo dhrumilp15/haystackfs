@@ -1,18 +1,9 @@
 from pathlib import Path
 import os
-import logging
 import aiofiles
 import msgpack
 from .models.command import Command
 from dataclasses import asdict
-
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
-fh = logging.FileHandler('logs/usage.log', encoding='utf-8', mode='w')
-fh.setFormatter(formatter)
-logger.addHandler(fh)
 
 
 class FileDataClient:
