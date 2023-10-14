@@ -1,14 +1,14 @@
 """Cog class."""
 from python.search.discord_searcher import DiscordSearcher
-from python.database.file_data_client import FileDataClient
 from python.models.query import Query
-from python.bot_secrets import DB_NAME
+from python.bot_secrets import DB_NAME, SEARCH_METRICS_CHANNEL_ID, EXPORT_METRICS_CHANNEL_ID, DELETE_METRICS_CHANNEL_ID
 import discord
 from discord import app_commands
 from discord.ext import commands
 from python.utils import search_opts, CONTENT_TYPE_CHOICES
 from python.bot_commands import fdelete, fsearch
 from python.export_template import generate_script
+from python.discord_utils import increment_command_count
 from typing import Tuple, Union
 import io
 import re
@@ -28,13 +28,11 @@ class Haystackfs(commands.Cog):
 
     def __init__(self,
                  bot,
-                 search_client,
-                 db_client):
+                 search_client):
         """Instantiate the bot."""
         self.bot = bot
         self.owner = None
         self.search_client = search_client
-        self.db_client = db_client
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -96,7 +94,7 @@ class Haystackfs(commands.Cog):
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
         else:
             await self.send_files_as_message(recipient, search_results)
-        await self.db_client.log_command(interaction, 'search', query)
+        await increment_command_count(self.bot, SEARCH_METRICS_CHANNEL_ID)
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -118,7 +116,6 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(interaction, 'export', query)
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
@@ -151,6 +148,7 @@ class Haystackfs(commands.Cog):
             await recipient.send(
                 f"Found {len(search_results.files)} file(s). Run this script to download them.",
                 file=discord.File(export_script, filename=filename))
+        await increment_command_count(self.bot, EXPORT_METRICS_CHANNEL_ID)
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
@@ -172,12 +170,12 @@ class Haystackfs(commands.Cog):
             before=before,
             dm=dm
         )
-        await self.db_client.log_command(interaction, 'delete', query)
         deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
         if isinstance(deleted_files, str):
             await interaction.followup.send(content=deleted_files, ephemeral=True)
             return
         await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
+        await increment_command_count(self.bot, DELETE_METRICS_CHANNEL_ID)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -222,5 +220,4 @@ def setup(bot):
     """
     print(f'In {DB_NAME} mode')
     searcher = DiscordSearcher()
-    command_client = FileDataClient(db_name=DB_NAME)
-    return Haystackfs(bot, searcher, command_client)
+    return Haystackfs(bot, searcher)

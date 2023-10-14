@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from ...models.query import Query
+from python.models.query import Query
 
 
 @dataclass
