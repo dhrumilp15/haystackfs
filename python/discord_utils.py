@@ -1,4 +1,6 @@
 import discord
+from discord.ext.commands import Bot
+import re
 
 
 async def update_server_count(home_guild: discord.Guild, num_guilds: int):
@@ -29,3 +31,13 @@ async def update_server_count(home_guild: discord.Guild, num_guilds: int):
                 await home_guild.create_voice_channel(name=name, category=category, user_limit=0)
             except:
                 pass
+
+
+async def increment_command_count(bot: Bot, channel_id: int):
+    match_string = r'(?P<desc>[a-zA-Z]*: )(?P<count>[0-9]*)'
+    channel = bot.get_channel(channel_id)
+    channel_name = channel.name
+    match = re.search(match_string, channel_name)
+    desc = match.group('desc')
+    count = int(match.group('count')) + 1
+    await channel.edit(name=f"{desc}{count}")
