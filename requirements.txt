@@ -13,10 +13,8 @@ frozenlist==1.4.0
 fuzzywuzzy==0.18.0
 idna==3.4
 Levenshtein==0.21.1
-msgpack==1.0.5
 multidict==6.0.4
 pycparser==2.21
-pymongo==4.5.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 python-Levenshtein==0.21.1
