@@ -2,7 +2,7 @@
 import discord
 from typing import List, Union
 import asyncio
-from fuzzywuzzy import fuzz
+from thefuzz import fuzz
 from ..models.query import Query
 from .search_models import SearchResults, SearchResult
 
