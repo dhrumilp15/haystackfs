@@ -4,3 +4,5 @@ NO_FILES_FOUND = ("I couldn't find any files related to your query. I may not ha
                   "permission for some channels.")
 RELOAD_DESCRIPTION = "Reloads the cog file. Use this to deploy changes to the bot"
 SEARCH_RESULTS_FOUND = "Found {}"
+MALFORMED_DATE_STRING = ("I couldn't understand the date you passed: {}. "
+                         "I can understand most year-month-day hour-minute-second formats.")
