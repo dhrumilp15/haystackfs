@@ -1,18 +1,17 @@
 """Main Bot Controller."""
-from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID, ERROR_CHANNEL_ID
+from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID
 import logging
 import discord
 from datetime import datetime
 import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
-from discord.interactions import Interaction
 from discord.ext.commands import Greedy, Context
-from python.messages import RELOAD_DESCRIPTION, ERROR_LOG_MESSAGE, ERROR_SUPPORT_MESSAGE
+from python.messages import RELOAD_DESCRIPTION
 from python.cogs.haystack_cog import setup as haystack_setup
 from python.cogs.admin_cog import setup as admin_setup
 from python.cogs.help_cog import setup as help_setup
-import traceback
+
 
 # logging
 dlogger = logging.getLogger('discord')
