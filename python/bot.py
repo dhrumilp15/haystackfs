@@ -16,7 +16,7 @@ import traceback
 
 # logging
 dlogger = logging.getLogger('discord')
-dlogger.setLevel(logging.DEBUG)
+dlogger.setLevel(logging.ERROR)
 handler = logging.FileHandler(filename='logs/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
