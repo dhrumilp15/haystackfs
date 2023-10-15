@@ -19,8 +19,7 @@ from python.search.search_models import SearchResults
 from python.messages import (
     INSUFFICIENT_BOT_PERMISSIONS,
     EXPORT_COMMAND_DESCRIPTION,
-    SEARCH_RESULTS_FOUND,
-    ERROR_SUPPORT_MESSAGE
+    SEARCH_RESULTS_FOUND
 )
 from ..exceptions import QueryException
 
