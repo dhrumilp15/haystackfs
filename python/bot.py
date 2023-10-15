@@ -16,7 +16,7 @@ import traceback
 
 # logging
 dlogger = logging.getLogger('discord')
-dlogger.setLevel(logging.ERROR)
+dlogger.setLevel(logging.DEBUG)
 handler = logging.FileHandler(filename='logs/discord.log', encoding='utf-8', mode='w')
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 handler.setFormatter(formatter)
@@ -75,6 +75,7 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
 
     await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
 
+error_task_set = set()
 
 @bot.tree.error
 async def on_command_error(ctx: Interaction, e):
@@ -83,8 +84,13 @@ async def on_command_error(ctx: Interaction, e):
     home_guild = bot.get_guild(GUILD_ID)
     channel = home_guild.get_channel(ERROR_CHANNEL_ID)
     tb_info = traceback.format_tb(e.original.__traceback__)
-    await channel.send(ERROR_LOG_MESSAGE.format(ctx.data['name'], ctx.data['options'], ''.join(tb_info)))
-    await ctx.followup.send(ERROR_SUPPORT_MESSAGE)
+    task1 = asyncio.create_task(channel.send(ERROR_LOG_MESSAGE.format(ctx.data['name'], ctx.data['options'], ''.join(tb_info))))
+    task2 = asyncio.create_task(ctx.followup.send(ERROR_SUPPORT_MESSAGE))
+    error_task_set.add(task1)
+    error_task_set.add(task2)
+    task1.add_done_callback(error_task_set.remove)
+    task2.add_done_callback(error_task_set.remove)
+
 
 if __name__ == "__main__":
     async def main():
