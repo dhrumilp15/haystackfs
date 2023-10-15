@@ -8,7 +8,7 @@ from discord.ext import commands
 from python.utils import search_opts, CONTENT_TYPE_CHOICES
 from python.bot_commands import fdelete, fsearch
 from python.export_template import generate_script
-from python.discord_utils import increment_command_count
+from python.discord_utils import increment_command_count, post_exception
 from typing import Tuple, Union
 import io
 import re
@@ -95,11 +95,14 @@ class Haystackfs(commands.Cog):
         except QueryException as e:
             await interaction.followup.send(content=e.message, ephemeral=dm)
             return
-        recipient, search_results = await self.locate(interaction=interaction, query=query)
-        if search_results.message:
-            await interaction.followup.send(content=search_results.message, ephemeral=dm)
-        else:
-            await self.send_files_as_message(recipient, search_results)
+        try:
+            recipient, search_results = await self.locate(interaction=interaction, query=query)
+            if search_results.message:
+                await interaction.followup.send(content=search_results.message, ephemeral=dm)
+            else:
+                await self.send_files_as_message(recipient, search_results)
+        except Exception as e:
+            await post_exception('search', query, interaction.followup, e.__traceback__, self.bot)
         await increment_command_count(self.bot, 'search')
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)

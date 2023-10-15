@@ -75,22 +75,6 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
 
     await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
 
-error_task_set = set()
-
-@bot.tree.error
-async def on_command_error(ctx: Interaction, e):
-    """Command Error Handler."""
-    print("Command error!!")
-    home_guild = bot.get_guild(GUILD_ID)
-    channel = home_guild.get_channel(ERROR_CHANNEL_ID)
-    tb_info = traceback.format_tb(e.original.__traceback__)
-    task1 = asyncio.create_task(channel.send(ERROR_LOG_MESSAGE.format(ctx.data['name'], ctx.data['options'], ''.join(tb_info))))
-    task2 = asyncio.create_task(ctx.followup.send(ERROR_SUPPORT_MESSAGE))
-    error_task_set.add(task1)
-    error_task_set.add(task2)
-    task1.add_done_callback(error_task_set.remove)
-    task2.add_done_callback(error_task_set.remove)
-
 
 if __name__ == "__main__":
     async def main():
