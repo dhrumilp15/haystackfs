@@ -9,7 +9,6 @@ charset-normalizer==3.2.0
 discord.py==2.3.2
 dnspython==2.4.2
 frozenlist==1.4.0
-fuzzywuzzy==0.18.0
 idna==3.4
 Levenshtein==0.21.1
 msgpack==1.0.5
@@ -22,5 +21,6 @@ python-Levenshtein==0.21.1
 rapidfuzz==3.2.0
 requests==2.31.0
 six==1.16.0
+thefuzz==0.20.0
 urllib3==1.26.16
 yarl==1.9.2

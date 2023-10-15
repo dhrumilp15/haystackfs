@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 from typing import List
 from ..models.query import Query
-from fuzzywuzzy import fuzz
+from thefuzz import fuzz
 from datetime import datetime
 
 
