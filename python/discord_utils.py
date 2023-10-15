@@ -1,6 +1,8 @@
 import discord
 from discord.ext.commands import Bot
 import re
+from python.bot_secrets import METRICS_CHANNEL_MAP
+from python.bot_secrets import DB_NAME
 
 
 async def update_server_count(home_guild: discord.Guild, num_guilds: int):
@@ -33,8 +35,9 @@ async def update_server_count(home_guild: discord.Guild, num_guilds: int):
                 pass
 
 
-async def increment_command_count(bot: Bot, channel_id: int):
-    match_string = r'(?P<desc>[a-zA-Z]*: )(?P<count>[0-9]*)'
+async def increment_command_count(bot: Bot, command_type: str):
+    match_string = r'(?P<desc>[a-zA-Z_]*: )(?P<count>[0-9]*)'
+    channel_id = METRICS_CHANNEL_MAP[DB_NAME][command_type]
     channel = bot.get_channel(channel_id)
     channel_name = channel.name
     match = re.search(match_string, channel_name)

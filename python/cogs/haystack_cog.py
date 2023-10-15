@@ -1,7 +1,7 @@
 """Cog class."""
 from python.search.discord_searcher import DiscordSearcher
 from python.models.query import Query
-from python.bot_secrets import DB_NAME, SEARCH_METRICS_CHANNEL_ID, EXPORT_METRICS_CHANNEL_ID, DELETE_METRICS_CHANNEL_ID
+from python.bot_secrets import DB_NAME
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -19,7 +19,8 @@ from python.search.search_models import SearchResults
 from python.messages import (
     INSUFFICIENT_BOT_PERMISSIONS,
     EXPORT_COMMAND_DESCRIPTION,
-    SEARCH_RESULTS_FOUND
+    SEARCH_RESULTS_FOUND,
+    ERROR_SUPPORT_MESSAGE
 )
 from ..exceptions import QueryException
 
@@ -94,13 +95,12 @@ class Haystackfs(commands.Cog):
         except QueryException as e:
             await interaction.followup.send(content=e.message, ephemeral=dm)
             return
-        raise Exception("sus!")
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
         else:
             await self.send_files_as_message(recipient, search_results)
-        await increment_command_count(self.bot, SEARCH_METRICS_CHANNEL_ID)
+        await increment_command_count(self.bot, 'search')
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -158,7 +158,7 @@ class Haystackfs(commands.Cog):
             await recipient.send(
                 f"Found {len(search_results.files)} file(s). Run this script to download them.",
                 file=discord.File(export_script, filename=filename))
-        await increment_command_count(self.bot, EXPORT_METRICS_CHANNEL_ID)
+        await increment_command_count(self.bot, 'export')
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
@@ -189,7 +189,7 @@ class Haystackfs(commands.Cog):
             await interaction.followup.send(content=deleted_files, ephemeral=True)
             return
         await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
-        await increment_command_count(self.bot, DELETE_METRICS_CHANNEL_ID)
+        await increment_command_count(self.bot, 'delete')
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
