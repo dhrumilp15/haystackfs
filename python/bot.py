@@ -6,8 +6,9 @@ from datetime import datetime
 import asyncio
 from typing import Literal, Optional
 from discord.ext import commands
+from discord.interactions import Interaction
 from discord.ext.commands import Greedy, Context
-from python.messages import RELOAD_DESCRIPTION
+from python.messages import RELOAD_DESCRIPTION, ERROR_LOG_MESSAGE, ERROR_SUPPORT_MESSAGE
 from python.cogs.haystack_cog import setup as haystack_setup
 from python.cogs.admin_cog import setup as admin_setup
 from python.cogs.help_cog import setup as help_setup
@@ -76,13 +77,14 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
 
 
 @bot.tree.error
-async def on_command_error(ctx, e):
+async def on_command_error(ctx: Interaction, e):
     """Command Error Handler."""
     print("Command error!!")
     home_guild = bot.get_guild(GUILD_ID)
     channel = home_guild.get_channel(ERROR_CHANNEL_ID)
     tb_info = traceback.format_tb(e.original.__traceback__)
-    await channel.send("".join(tb_info))
+    await channel.send(ERROR_LOG_MESSAGE.format(ctx.data['name'], ctx.data['options'], ''.join(tb_info)))
+    await ctx.followup.send(ERROR_SUPPORT_MESSAGE)
 
 if __name__ == "__main__":
     async def main():

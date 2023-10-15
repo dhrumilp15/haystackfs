@@ -94,6 +94,7 @@ class Haystackfs(commands.Cog):
         except QueryException as e:
             await interaction.followup.send(content=e.message, ephemeral=dm)
             return
+        raise Exception("sus!")
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
