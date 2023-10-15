@@ -21,6 +21,7 @@ from python.messages import (
     EXPORT_COMMAND_DESCRIPTION,
     SEARCH_RESULTS_FOUND
 )
+from ..exceptions import QueryException
 
 
 class Haystackfs(commands.Cog):
@@ -78,17 +79,21 @@ class Haystackfs(commands.Cog):
                            after: str = None, before: str = None, dm: bool = False):
         """Responds to `/search`. Tries to display docs that match a query."""
         await interaction.response.defer(ephemeral=dm)
-        query = Query(
-            filename=filename,
-            filetype=filetype,
-            custom_filetype=custom_filetype,
-            author=author,
-            channel=channel,
-            content=content,
-            after=after,
-            before=before,
-            dm=dm
-        )
+        try:
+            query = Query(
+                filename=filename,
+                filetype=filetype,
+                custom_filetype=custom_filetype,
+                author=author,
+                channel=channel,
+                content=content,
+                after=after,
+                before=before,
+                dm=dm
+            )
+        except QueryException as e:
+            await interaction.followup.send(content=e.message, ephemeral=dm)
+            return
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
@@ -105,17 +110,21 @@ class Haystackfs(commands.Cog):
                            after: str = None, before: str = None, dm: bool = None):
         """Responds to `/export`. Builds a download script for all files matching a query."""
         await interaction.response.defer(ephemeral=dm)
-        query = Query(
-            filename=filename,
-            filetype=filetype,
-            custom_filetype=custom_filetype,
-            author=author,
-            channel=channel,
-            content=content,
-            after=after,
-            before=before,
-            dm=dm
-        )
+        try:
+            query = Query(
+                filename=filename,
+                filetype=filetype,
+                custom_filetype=custom_filetype,
+                author=author,
+                channel=channel,
+                content=content,
+                after=after,
+                before=before,
+                dm=dm
+            )
+        except QueryException as e:
+            await interaction.followup.send(content=e.message, ephemeral=dm)
+            return
         recipient, search_results = await self.locate(interaction=interaction, query=query)
         if search_results.message:
             await interaction.followup.send(content=search_results.message, ephemeral=dm)
@@ -159,17 +168,21 @@ class Haystackfs(commands.Cog):
                            after: str = None, before: str = None, dm: bool = None):
         """Respond to `/delete`. Remove docs matching a query and their respective discord messages."""
         await interaction.response.defer(ephemeral=True)
-        query = Query(
-            filename=filename,
-            filetype=filetype,
-            custom_filetype=custom_filetype,
-            author=author,
-            channel=channel,
-            content=content,
-            after=after,
-            before=before,
-            dm=dm
-        )
+        try:
+            query = Query(
+                filename=filename,
+                filetype=filetype,
+                custom_filetype=custom_filetype,
+                author=author,
+                channel=channel,
+                content=content,
+                after=after,
+                before=before,
+                dm=dm
+            )
+        except QueryException as e:
+            await interaction.followup.send(content=e.message, ephemeral=dm)
+            return
         deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
         if isinstance(deleted_files, str):
             await interaction.followup.send(content=deleted_files, ephemeral=True)
