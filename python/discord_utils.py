@@ -50,10 +50,17 @@ async def increment_command_count(bot: Bot, command_type: str):
     await channel.edit(name=f"{desc}{count}")
 
 
-async def post_exception(command_type: str, query, source, tb, bot):
+async def post_exception(command_type: str, query, source, args, tb, bot):
     print("Command error!!")
     home_guild = bot.get_guild(GUILD_ID)
     channel = home_guild.get_channel(ERROR_CHANNEL_ID)
     tb_info = traceback.format_tb(tb)
-    await channel.send(ERROR_LOG_MESSAGE.format(command_type, query, ''.join(tb_info)))
+    await channel.send(ERROR_LOG_MESSAGE.format(command_type, query, ''.join([tb_info, "\n", str(args)])))
     await source.send(ERROR_SUPPORT_MESSAGE)
+
+
+async def send_or_edit(send_source, edit_source, send: bool, *args, **kwargs):
+    if send:
+        await send_source.send(*args, **kwargs)
+    else:
+        await edit_source.edit(*args, **kwargs)
