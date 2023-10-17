@@ -23,7 +23,6 @@ from python.messages import (
 )
 from python.discord_utils import send_or_edit
 from ..exceptions import QueryException
-import asyncio
 
 
 class Haystackfs(commands.Cog):
