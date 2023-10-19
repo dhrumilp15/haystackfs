@@ -55,7 +55,7 @@ async def post_exception(command_type: str, query, source, args, tb, bot):
     home_guild = bot.get_guild(GUILD_ID)
     channel = home_guild.get_channel(ERROR_CHANNEL_ID)
     tb_info = traceback.format_tb(tb)
-    await channel.send(ERROR_LOG_MESSAGE.format(command_type, query, ''.join([tb_info, "\n", str(args)])))
+    await channel.send(ERROR_LOG_MESSAGE.format(command_type, query, ''.join([''.join(tb_info), "\n", str(args)])))
     await source.send(ERROR_SUPPORT_MESSAGE)
 
 
