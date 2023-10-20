@@ -9,16 +9,14 @@ class AdminCog(commands.Cog):
         super().__init__()
         self.bot = bot
         self.home_guild = None
-        self.owner = None
 
     @commands.Cog.listener()
     async def on_ready(self):
-        appinfo = await self.bot.application_info()
-        self.owner = appinfo.owner
         self.home_guild = self.bot.get_guild(GUILD_ID)
+        await update_server_count(self.home_guild, len(self.bot.guilds))
 
     @commands.Cog.listener()
-    async def on_guild_join(self):
+    async def on_guild_join(self, guild):
         """Log guild joins."""
         await update_server_count(self.home_guild, len(self.bot.guilds))
 
