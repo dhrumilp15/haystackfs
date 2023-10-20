@@ -13,11 +13,7 @@ class FileDropDown(discord.ui.Select):
         return ','.join(map(str, [file.channel_id, file.message_id, file.objectId]))
 
     def produce_options(self):
-        options = []
-        for value, name in self.value_to_name.items():
-            option = discord.SelectOption(label=name[:100], value=value)
-            options.append(option)
-        return options
+        return [discord.SelectOption(label=name[:25], value=value) for value, name in self.value_to_name.items()]
 
     async def callback(self, interaction: discord.Interaction):
         # edit the embed here
