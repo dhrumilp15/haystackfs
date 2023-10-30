@@ -3,7 +3,6 @@ from .messages import ERROR_LOG_MESSAGE
 import traceback
 from python.bot_secrets import ERROR_CHANNEL_ID
 from python.bot_secrets import GUILD_ID
-from dateutil.parser import ParserError
 
 
 class QueryException(Exception):
@@ -30,4 +29,4 @@ class GeneralExceptionHandler:
         elif exc_type is not None:
             await self.interaction.followup.send(content=ERROR_SUPPORT_MESSAGE, ephemeral=True)
             tb_info = traceback.format_tb(exc_tb)
-            await self.channel.send(ERROR_LOG_MESSAGE.format(self.command_type, self.query, tb_info))
+            await self.channel.send(ERROR_LOG_MESSAGE.format(self.command_type, self.query, ''.join(tb_info), str(exc_val)))

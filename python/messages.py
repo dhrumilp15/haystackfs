@@ -6,6 +6,6 @@ RELOAD_DESCRIPTION = "Reloads the cog file. Use this to deploy changes to the bo
 SEARCH_RESULTS_FOUND = "Found {}"
 MALFORMED_DATE_STRING = ("I couldn't understand the date you passed: {}. "
                          "I can understand most year-month-day hour-minute-second formats.")
-ERROR_LOG_MESSAGE = "Command: {}, Query: {}, Exception:\n{}"
+ERROR_LOG_MESSAGE = "Command: {}, Query: {}, Exception:\n{}, Value:\n{}"
 ERROR_SUPPORT_MESSAGE = "An error has occurred and the bot developer will be looking into the error soon."
 SEARCHING_MESSAGE = "Searching... I'll edit this message when I've found results!"
