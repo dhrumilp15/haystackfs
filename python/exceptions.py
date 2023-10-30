@@ -3,6 +3,7 @@ from .messages import ERROR_LOG_MESSAGE
 import traceback
 from python.bot_secrets import ERROR_CHANNEL_ID
 from python.bot_secrets import GUILD_ID
+from dateutil.parser import ParserError
 
 
 class QueryException(Exception):
@@ -24,7 +25,7 @@ class GeneralExceptionHandler:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if isinstance(exc_type, QueryException):
+        if exc_type is QueryException:
             await self.interaction.followup.send(exc_val.message)
         elif exc_type is not None:
             await self.interaction.followup.send(content=ERROR_SUPPORT_MESSAGE, ephemeral=True)
