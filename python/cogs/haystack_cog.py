@@ -8,7 +8,7 @@ from discord.ext import commands
 from python.utils import search_opts, CONTENT_TYPE_CHOICES
 from python.bot_commands import fdelete, fsearch
 from python.export_template import generate_script
-from python.discord_utils import increment_command_count, post_exception
+from python.discord_utils import increment_command_count
 import io
 import re
 import hashlib
@@ -22,7 +22,7 @@ from python.messages import (
     SEARCHING_MESSAGE,
 )
 from python.discord_utils import send_or_edit
-from ..exceptions import QueryException
+from ..exceptions import GeneralExceptionHandler
 
 
 class Haystackfs(commands.Cog):
@@ -72,8 +72,8 @@ class Haystackfs(commands.Cog):
                            after: str = None, before: str = None, dm: bool = False):
         """Responds to `/search`. Tries to display docs that match a query."""
         await interaction.response.defer(ephemeral=dm)
-        try:
-            query = Query(
+        async with GeneralExceptionHandler(interaction=interaction, bot=self.bot, command_type='search') as ghe:
+            ghe.query = Query(
                 filename=filename,
                 filetype=filetype,
                 custom_filetype=custom_filetype,
@@ -84,19 +84,19 @@ class Haystackfs(commands.Cog):
                 before=before,
                 dm=dm
             )
-        except QueryException as e:
-            await interaction.followup.send(content=e.message, ephemeral=dm)
-            return
-        try:
             send_source, edit_source = await self._get_send_and_edit_recipients(interaction=interaction, send=dm)
-            search_results = await self.locate(interaction=interaction, query=query)
-            if search_results.message:
+            search_results = await self.locate(interaction=interaction, query=ghe.query)
+            if not search_results.files:
                 await interaction.followup.send(content=search_results.message, ephemeral=dm)
             else:
-                await self.send_files_as_message(interaction.user.mention, send_source, edit_source, dm, search_results)
-        except Exception as e:
-            await post_exception('search', query, interaction.followup, e.args, e.__traceback__, self.bot)
-        await increment_command_count(self.bot, 'search')
+                await self.send_files_as_message(
+                    interaction.user.mention,
+                    send_source,
+                    edit_source,
+                    dm,
+                    search_results
+                )
+            await increment_command_count(self.bot, 'search')
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -107,8 +107,8 @@ class Haystackfs(commands.Cog):
                            after: str = None, before: str = None, dm: bool = None):
         """Responds to `/export`. Builds a download script for all files matching a query."""
         await interaction.response.defer(ephemeral=dm)
-        try:
-            query = Query(
+        async with GeneralExceptionHandler(interaction=interaction, bot=self.bot, command_type='export') as ghe:
+            ghe.query = Query(
                 filename=filename,
                 filetype=filetype,
                 custom_filetype=custom_filetype,
@@ -119,48 +119,45 @@ class Haystackfs(commands.Cog):
                 before=before,
                 dm=dm
             )
-        except QueryException as e:
-            await interaction.followup.send(content=e.message, ephemeral=dm)
-            return
-        send_source, edit_source = await self._get_send_and_edit_recipients(interaction=interaction, send=dm)
-        search_results = await self.locate(interaction=interaction, query=query)
-        if search_results.message:
-            await interaction.followup.send(content=search_results.message, ephemeral=dm)
-            return
+            send_source, edit_source = await self._get_send_and_edit_recipients(interaction=interaction, send=dm)
+            search_results = await self.locate(interaction=interaction, query=ghe.query)
+            if search_results.message:
+                await interaction.followup.send(content=search_results.message, ephemeral=dm)
+                return
 
-        # So file names are maximally compatible.
-        def sanitize(s, default): return re.sub(r"[^A-Za-z0-9'\-\_ ]", "", s).rstrip() or default
+            # So file names are maximally compatible.
+            def sanitize(s, default): return re.sub(r"[^A-Za-z0-9'\-\_ ]", "", s).rstrip() or default
 
-        # Restrict to channels that the search returns files for. This is so that the
-        # script does not leak the full server channel list every export. This mapping
-        # is required so the export script can save files in directories named by the channels.
-        needed_ids = set(f.channel_id for f in search_results.files)
-        if interaction.guild is None:
-            chan = interaction.channel
-            channels = {str(chan.id): sanitize(chan, str(chan.id))}
-            guild_name = sanitize(chan.name, "export")
-        else:
-            channels = {
-                str(c.id): sanitize(c.name, str(c.id))
-                for c in interaction.guild.channels
-                if c.id in needed_ids
-            }
-            guild_name = sanitize(interaction.guild.name, "export")
+            # Restrict to channels that the search returns files for. This is so that the
+            # script does not leak the full server channel list every export. This mapping
+            # is required so the export script can save files in directories named by the channels.
+            needed_ids = set(f.channel_id for f in search_results.files)
+            if interaction.guild is None:
+                chan = interaction.channel
+                channels = {str(chan.id): sanitize(chan, str(chan.id))}
+                guild_name = sanitize(chan.name, "export")
+            else:
+                channels = {
+                    str(c.id): sanitize(c.name, str(c.id))
+                    for c in interaction.guild.channels
+                    if c.id in needed_ids
+                }
+                guild_name = sanitize(interaction.guild.name, "export")
 
-        # This is so that if one is running multiple exports in a server,
-        # they don't get export(1).py etc.
-        unique_suffix = hashlib.sha256(bytes(str(sorted(f.url for f in search_results.files)), "utf-8")).hexdigest()[:5]
-        filename = f"export_{guild_name}_{unique_suffix}.py"
+            # This is so that if one is running multiple exports in a server,
+            # they don't get export(1).py etc.
+            unique_suffix = hashlib.sha256(bytes(str(sorted(f.url for f in search_results.files)), "utf-8")).hexdigest()[:5]
+            filename = f"export_{guild_name}_{unique_suffix}.py"
 
-        with io.StringIO(generate_script(guild_name, search_results.files, channels)) as export_script:
-            await send_or_edit(
-                send_source=send_source,
-                edit_source=edit_source,
-                send=dm,
-                content=f"Found {len(search_results.files)} file(s). Run this script to download them.",
-                file=discord.File(export_script, filename=filename)
-            )
-        await increment_command_count(self.bot, 'export')
+            with io.StringIO(generate_script(guild_name, search_results.files, channels)) as export_script:
+                await send_or_edit(
+                    send_source=send_source,
+                    edit_source=edit_source,
+                    send=dm,
+                    content=f"Found {len(search_results.files)} file(s). Run this script to download them.",
+                    file=discord.File(export_script, filename=filename)
+                )
+            await increment_command_count(self.bot, 'export')
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
@@ -170,9 +167,9 @@ class Haystackfs(commands.Cog):
                            author: discord.User = None, channel: discord.TextChannel = None, content: str = None,
                            after: str = None, before: str = None, dm: bool = None):
         """Respond to `/delete`. Remove docs matching a query and their respective discord messages."""
-        await interaction.response.defer(ephemeral=True)
-        try:
-            query = Query(
+        await interaction.response.defer(ephemeral=dm)
+        async with GeneralExceptionHandler(interaction=interaction, bot=self.bot, command_type='delete') as ghe:
+            ghe.query = Query(
                 filename=filename,
                 filetype=filetype,
                 custom_filetype=custom_filetype,
@@ -183,15 +180,12 @@ class Haystackfs(commands.Cog):
                 before=before,
                 dm=dm
             )
-        except QueryException as e:
-            await interaction.followup.send(content=e.message, ephemeral=dm)
-            return
-        deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
-        if isinstance(deleted_files, str):
-            await interaction.followup.send(content=deleted_files, ephemeral=True)
-            return
-        await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
-        await increment_command_count(self.bot, 'delete')
+            deleted_files = await fdelete(interaction, self.search_client, self.bot, ghe.query)
+            if isinstance(deleted_files, str):
+                await interaction.followup.send(content=deleted_files, ephemeral=True)
+                return
+            await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
+            await increment_command_count(self.bot, 'delete')
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
