@@ -3,10 +3,6 @@ from discord.ext.commands import Bot
 import re
 from python.bot_secrets import METRICS_CHANNEL_MAP
 from python.bot_secrets import DB_NAME
-from python.bot_secrets import ERROR_CHANNEL_ID
-from python.bot_secrets import GUILD_ID
-from python.messages import ERROR_LOG_MESSAGE, ERROR_SUPPORT_MESSAGE
-import traceback
 
 
 async def update_server_count(home_guild: discord.Guild, num_guilds: int):
@@ -48,15 +44,6 @@ async def increment_command_count(bot: Bot, command_type: str):
     desc = match.group('desc')
     count = int(match.group('count')) + 1
     await channel.edit(name=f"{desc}{count}")
-
-
-async def post_exception(command_type: str, query, source, args, tb, bot):
-    print("Command error!!")
-    home_guild = bot.get_guild(GUILD_ID)
-    channel = home_guild.get_channel(ERROR_CHANNEL_ID)
-    tb_info = traceback.format_tb(tb)
-    await channel.send(ERROR_LOG_MESSAGE.format(command_type, query, ''.join([''.join(tb_info), "\n", str(args)])))
-    await source.send(ERROR_SUPPORT_MESSAGE)
 
 
 async def send_or_edit(send_source, edit_source, send: bool, *args, **kwargs):

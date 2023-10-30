@@ -32,7 +32,7 @@ class Query:
         if self.after:
             try:
                 after = parser.parse(self.after)
-            except ParserError:
+            except:
                 raise QueryException(MALFORMED_DATE_STRING.format(self.after))
             after = datetime(*after.timetuple()[:3])
             after -= timedelta(microseconds=1)
