@@ -35,7 +35,7 @@ class DiscordSearcher:
 
         messages = onii_chan.history(limit=None, before=query.before, after=query.after)
         async for message in messages:
-            if len(files) >= self.search_result_limit:
+            if len(files) == self.search_result_limit:
                 channel_date_map[onii_chan.id] = message.created_at
                 break
             if not message.attachments:

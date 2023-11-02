@@ -1,8 +1,8 @@
 from .messages import ERROR_SUPPORT_MESSAGE
-from .messages import ERROR_LOG_MESSAGE
-import traceback
 from python.bot_secrets import ERROR_CHANNEL_ID
 from python.bot_secrets import GUILD_ID
+from python.discord_utils import post_exception
+from python.discord_utils import increment_command_count
 
 
 class QueryException(Exception):
@@ -10,12 +10,12 @@ class QueryException(Exception):
         self.message = message
 
 
-class GeneralExceptionHandler:
+class CommandHandler:
 
-    def __init__(self, interaction, bot, command_type: str):
+    def __init__(self, interaction, bot, command_type: str, query):
         self.interaction = interaction
         self.bot = bot
-        self.query = None
+        self.query = query
         home_guild = self.bot.get_guild(GUILD_ID)
         self.channel = home_guild.get_channel(ERROR_CHANNEL_ID)
         self.command_type = command_type
@@ -28,5 +28,5 @@ class GeneralExceptionHandler:
             await self.interaction.followup.send(exc_val.message)
         elif exc_type is not None:
             await self.interaction.followup.send(content=ERROR_SUPPORT_MESSAGE, ephemeral=True)
-            tb_info = traceback.format_tb(exc_tb)
-            await self.channel.send(ERROR_LOG_MESSAGE.format(self.command_type, self.query, ''.join(tb_info), str(exc_val)))
+            await post_exception(self.channel, exc_tb, exc_val, self.command_type, self.query)
+        await increment_command_count(self.bot, self.command_type)
