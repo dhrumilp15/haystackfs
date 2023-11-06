@@ -21,7 +21,15 @@ class DiscordSearcher:
         self.thresh = thresh
         self.search_result_limit = 25
 
-    async def chan_search(self, onii_chan: discord.TextChannel, query: Query, files, file_set, channel_date_map) -> List[SearchResult]:
+    async def chan_search(
+            self,
+            onii_chan: discord.TextChannel,
+            query: Query,
+            files,
+            file_set,
+            channel_date_map,
+            sem
+    ):
         """
         Search a channel index for a query.
 
@@ -32,22 +40,24 @@ class DiscordSearcher:
         Yields:
             A list of dicts of files
         """
-
-        messages = onii_chan.history(limit=None, before=query.before, after=query.after)
-        async for message in messages:
+        async with sem:
             if len(files) == self.search_result_limit:
-                channel_date_map[onii_chan.id] = message.created_at
-                break
-            if not message.attachments:
-                continue
-            metadatas = list(map(lambda atch: SearchResult.from_discord_attachment(message, atch), message.attachments))
-            for metadata in metadatas:
-                if metadata.objectId in self.banned_file_ids or metadata.objectId in file_set:
+                return
+            messages = onii_chan.history(limit=None, before=query.before, after=query.after)
+            async for message in messages:
+                if len(files) == self.search_result_limit:
+                    channel_date_map[onii_chan.id] = message.created_at
+                    break
+                if not message.attachments:
                     continue
-                if metadata.match_query(query=query, thresh=self.thresh):
-                    if metadata.objectId not in file_set:
-                        file_set.add(metadata.objectId)
-                        files.append(metadata)
+                for attachment in message.attachments:
+                    metadata = SearchResult.from_discord_attachment(message, attachment)
+                    if metadata.objectId in self.banned_file_ids or metadata.objectId in file_set:
+                        continue
+                    if metadata.match_query(query=query, thresh=self.thresh):
+                        if metadata.objectId not in file_set:
+                            file_set.add(metadata.objectId)
+                            files.append(metadata)
 
     async def search(self, onii_chans: List[Union[discord.DMChannel, discord.Guild]],
                      bot_user=None, query: Query = None) -> SearchResults:
@@ -68,9 +78,9 @@ class DiscordSearcher:
         tasks = []
         # getting files from each channel one at a time is really slow, but
         channel_date_map = {chan.id: None for chan in onii_chans}
-
+        sem = asyncio.Semaphore(10)
         for onii_chan in onii_chans:
-            tasks.append(self.chan_search(onii_chan, query, files, files_set, channel_date_map))
+            tasks.append(self.chan_search(onii_chan, query, files, files_set, channel_date_map, sem))
         await asyncio.gather(*tasks)
         if query.filename:
             files = sorted(files, reverse=True, key=lambda x: fuzz.ratio(query.filename, x.filename))
