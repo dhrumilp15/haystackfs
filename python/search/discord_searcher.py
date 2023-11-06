@@ -10,7 +10,7 @@ from .search_models import SearchResults, SearchResult
 class DiscordSearcher:
     """Search for files in discord with just discord."""
 
-    def __init__(self, thresh: int = 75):
+    def __init__(self, thresh: int = 85):
         """
         Create a DiscordSearch object.
 
