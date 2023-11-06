@@ -21,7 +21,7 @@ class AdminCog(commands.Cog):
         await update_server_count(self.home_guild, len(self.bot.guilds))
 
     @commands.Cog.listener()
-    async def on_guild_remove(self):
+    async def on_guild_remove(self, guild):
         """Log guild joins."""
         await update_server_count(self.home_guild, len(self.bot.guilds))
 
