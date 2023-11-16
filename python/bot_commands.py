@@ -38,8 +38,7 @@ async def fdelete(interaction: discord.Interaction or commands.Context, search_c
     return deleted_files
 
 
-async def fsearch(interaction: discord.Interaction or commands.Context,
-                  search_client: DiscordSearcher, query: Query) -> SearchResults:
+async def fsearch(interaction: discord.Interaction, search_client: DiscordSearcher, query: Query) -> SearchResults:
     """
     Find docs related to a query in ElasticSearch.
 
@@ -56,7 +55,8 @@ async def fsearch(interaction: discord.Interaction or commands.Context,
     if interaction.guild is not None:
         bot_user = interaction.guild.me
         if not query.channel:
-            onii_chan = interaction.guild.text_channels
+            forum_threads = [thread for channel in interaction.guild.forums for thread in channel.threads]
+            onii_chan = interaction.guild.text_channels + forum_threads
 
     search_results = await search_client.search(
         onii_chans=onii_chan,
