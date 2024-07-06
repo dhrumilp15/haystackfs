@@ -10,8 +10,6 @@ Files you upload are *immediately* indexed so that you can search for files as s
 
 [**Click here to add the bot to your server**](https://discord.com/api/oauth2/authorize?client_id=837345172105723985&permissions=2147593280&scope=bot%20applications.commands) and [**click here to join the community**](https://discord.gg/rp8aZSjevn).
 
-Check out our site [here](https://typedream.site/discordfs)!
-
 **Check out the [self-hosting guide](docs/SELF_HOSTING_GUIDE.md) if you'd like to use the bot locally!**
 
 ## Commands
