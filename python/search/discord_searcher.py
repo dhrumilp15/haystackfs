@@ -22,13 +22,13 @@ class DiscordSearcher:
         self.search_result_limit = 25
 
     async def chan_search(
-        self,
-        onii_chan: discord.TextChannel,
-        query: Query,
-        files,
-        file_set,
-        channel_date_map,
-        sem
+            self,
+            onii_chan: discord.TextChannel,
+            query: Query,
+            files,
+            file_set,
+            channel_date_map,
+            sem
     ):
         """
         Search a channel index for a query.
