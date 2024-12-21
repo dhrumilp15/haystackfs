@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from python.utils import search_opts, CONTENT_TYPE_CHOICES
-from python.bot_commands import fdelete, fsearch
+from python.bot_commands import fsearch
 from python.export_template import generate_script
 import io
 import re
@@ -27,9 +27,7 @@ from python.cogs.utils import give_signature
 class Haystackfs(commands.Cog):
     """Main class for the bot."""
 
-    def __init__(self,
-                 bot,
-                 search_client):
+    def __init__(self, bot, search_client):
         """Instantiate the bot."""
         self.bot = bot
         self.owner = None
@@ -42,8 +40,6 @@ class Haystackfs(commands.Cog):
         self.owner = appinfo.owner
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
-        # await update_server_count(self.home_guild, len(self.bot.guilds))
-        # print("updated server count")
 
     async def locate(self, interaction: discord.Interaction, query: Query) -> SearchResults:
         """
@@ -122,8 +118,8 @@ class Haystackfs(commands.Cog):
                 send_source=send_source,
                 edit_source=edit_source,
                 send=query.dm,
-                content=f"Found {len(search_results.files)} file(s). Run this script to download them.",
-                file=discord.File(export_script, filename=filename)
+                content=f"Found {len(search_results.files)} file{'s' if search_results.files else ''}. Run this script to download them.",
+                attachments=[discord.File(export_script, filename=filename)]
             )
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")
@@ -132,7 +128,19 @@ class Haystackfs(commands.Cog):
     @give_signature
     async def slash_delete(self, interaction: discord.Interaction, query: Query):
         """Respond to `/delete`. Remove docs matching a query and their respective discord messages."""
-        deleted_files = await fdelete(interaction, self.search_client, self.bot, query)
+        search_results = await self.locate(interaction=interaction, query=query)
+        if not search_results.files:
+            await interaction.followup.send(content=search_results.message, ephemeral=query.dm)
+            return
+        deleted_files = []
+        for file in search_results.files:
+            try:
+                onii_chan = self.bot.get_channel(int(file.channel_id))
+                message = await onii_chan.fetch_message(file.message_id)
+                await message.delete()
+                deleted_files.append(file.filename)
+            except (discord.Forbidden, discord.errors.NotFound):
+                continue
         if isinstance(deleted_files, str):
             await interaction.followup.send(content=deleted_files, ephemeral=True)
             return

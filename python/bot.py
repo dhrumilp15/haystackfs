@@ -83,4 +83,4 @@ if __name__ == "__main__":
             await bot.add_cog(admin_setup(bot))
             await bot.add_cog(help_setup(bot))
             await bot.start(TOKEN)
-    asyncio.run(main(), debug=True)
+    asyncio.run(main())

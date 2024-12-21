@@ -1,41 +1,9 @@
 """The core functionality of the bot."""
 from .models.query import Query
 import discord
-from discord.ext import commands
-from typing import List
 from .search.search_models import SearchResults
 from .search.discord_searcher import DiscordSearcher
 from .messages import NO_FILES_FOUND
-
-
-async def fdelete(interaction: discord.Interaction or commands.Context, search_client,
-                  bot: commands.Bot, query: Query) -> List[str]:
-    """
-    Remove files from our storage and delete their corresponding discord messages.
-
-    Args:
-        interaction: The message's origin
-        search_client: The Search client
-        bot: The discord bot
-        query: The search query
-
-    Returns:
-        A list of filenames that were deleted
-    """
-    serv_id = interaction.channel.id
-    if interaction.guild is not None:
-        serv_id = interaction.guild.id
-    files = await search_client.search(serv_id, query=query)
-    deleted_files = []
-    for file in files.files:
-        try:
-            onii_chan = bot.get_channel(int(file.channel_id))
-            message = await onii_chan.fetch_message(file.message_id)
-            await message.delete()
-            deleted_files.append(file.filename)
-        except (discord.Forbidden, discord.errors.NotFound):
-            continue
-    return deleted_files
 
 
 async def fsearch(interaction: discord.Interaction, search_client: DiscordSearcher, query: Query) -> SearchResults:
