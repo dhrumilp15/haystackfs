@@ -78,7 +78,7 @@ class DiscordSearcher:
         tasks = []
         # getting files from each channel one at a time is really slow, but
         channel_date_map = {chan.id: None for chan in onii_chans}
-        sem = asyncio.Semaphore(10)
+        sem = asyncio.Semaphore(30)
         for onii_chan in onii_chans:
             tasks.append(self.chan_search(onii_chan, query, files, files_set, channel_date_map, sem))
         await asyncio.gather(*tasks)

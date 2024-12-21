@@ -64,16 +64,13 @@ class SearchResult:
                 if getattr(self, key + "_id") != value.id:
                     return False
             elif key == "filetype":
-                filetype = self.content_type
-                if filetype is None:
-                    value = value[value.index('/') + 1:]
-                    filetype = self.filetype
                 if value == 'image' and not self.is_image():
                     return False
                 if value == 'audio' and not self.is_audio():
                     return False
-                if value != filetype:
-                    return False
+                if self.content_type or (self.filetype and self.filetype != "unknown"):
+                    if value not in self.filetype and value not in self.content_type:
+                        return False
         return True
 
     def is_image(self):
