@@ -184,7 +184,7 @@ class Haystackfs(commands.Cog):
         avatar_url = self.bot.user.display_avatar.url
         if len(search_results.files) > 25:
             search_results.files = search_results.files[:25]
-        view = FileView(search_results)
+        view = FileView(search_results, search_client=self.search_client)
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
         message = SEARCH_RESULTS_FOUND.format(search_results.files[0].filename)[:100]
         await send_or_edit(

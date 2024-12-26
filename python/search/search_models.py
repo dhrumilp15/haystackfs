@@ -53,12 +53,14 @@ class SearchResult:
             elif key == "after":
                 created_at = datetime.fromisoformat(self.created_at)
                 created_at = created_at.replace(tzinfo=None)
-                if created_at < value:
+                channel_time = value[self.channel_id]
+                if created_at < channel_time:
                     return False
             elif key == "before":
                 created_at = datetime.fromisoformat(self.created_at)
                 created_at = created_at.replace(tzinfo=None)
-                if created_at > value:
+                channel_time = value[self.channel_id]
+                if created_at > channel_time:
                     return False
             elif key == "author" or key == "channel":
                 if getattr(self, key + "_id") != value.id:

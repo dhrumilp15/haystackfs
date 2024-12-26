@@ -18,6 +18,7 @@ class Query:
     after: str or datetime = None
     before: str or datetime = None
     dm: bool = False
+    channel_date_map: dict[str, datetime] = None
 
     def __post_init__(self):
         if self.before:

@@ -8,7 +8,7 @@ class FileEmbed(HaystackEmbed):
     def __init__(self, search_results: SearchResults, name: str, avatar_url: str):
         """Build file search embed."""
         super().__init__(
-            title=SEARCH_RESULTS_FOUND.format(len(search_results.files)) + " file(s)",
+            title=SEARCH_RESULTS_FOUND.format(len(search_results.files)) + f" file{'s' if search_results.files else ''}",
             name=name, avatar_url=avatar_url
         )
         first_file = search_results.files[0]
