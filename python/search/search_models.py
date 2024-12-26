@@ -68,9 +68,10 @@ class SearchResult:
                     return False
                 if value == 'audio' and not self.is_audio():
                     return False
-                if self.content_type or (self.filetype and self.filetype != "unknown"):
-                    if value not in self.filetype and value not in self.content_type:
-                        return False
+                matches_file_type = self.filetype is not None and self.filetype != "unknown" and value in self.filetype
+                matches_content_type = self.content_type is not None and value in self.content_type
+                if not matches_content_type and not matches_file_type:
+                    return False
         return True
 
     def is_image(self):
