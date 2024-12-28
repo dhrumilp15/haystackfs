@@ -16,7 +16,6 @@ class FileDropDown(discord.ui.Select):
         return [discord.SelectOption(label=name[:25], value=value) for value, name in self.value_to_name.items()]
 
     async def callback(self, interaction: discord.Interaction):
-        # edit the embed here
         value = self.values[0]
         name = self.value_to_name[value]
         message = interaction.message

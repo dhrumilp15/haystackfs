@@ -13,8 +13,9 @@ class FileEmbed(HaystackEmbed):
         )
         first_file = search_results.files[0]
         filename = first_file.filename[:100]
-        mediaUrl = first_file.jump_url
+        media_url = first_file.jump_url
 
-        super().insert_field_at(index=0, name=filename, value=mediaUrl, inline=False)
+        super().insert_field_at(index=0, name=filename, value=media_url, inline=False)
         if first_file.is_image():
             super().set_image(url=first_file.url)
+        super().set_footer(text="Page 1, " + super().footer.text, icon_url=super().footer.icon_url)

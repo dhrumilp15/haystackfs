@@ -53,14 +53,12 @@ class SearchResult:
             elif key == "after":
                 created_at = datetime.fromisoformat(self.created_at)
                 created_at = created_at.replace(tzinfo=None)
-                channel_time = value[self.channel_id]
-                if created_at < channel_time:
+                if created_at < query.after:
                     return False
             elif key == "before":
                 created_at = datetime.fromisoformat(self.created_at)
                 created_at = created_at.replace(tzinfo=None)
-                channel_time = value[self.channel_id]
-                if created_at > channel_time:
+                if created_at > query.before:
                     return False
             elif key == "author" or key == "channel":
                 if getattr(self, key + "_id") != value.id:
@@ -69,6 +67,8 @@ class SearchResult:
                 if value == 'image' and not self.is_image():
                     return False
                 if value == 'audio' and not self.is_audio():
+                    return False
+                if value == 'archive' and not self.is_archive():
                     return False
                 matches_file_type = self.filetype is not None and self.filetype != "unknown" and value in self.filetype
                 matches_content_type = self.content_type is not None and value in self.content_type
@@ -89,6 +89,11 @@ class SearchResult:
         if 'audio' in self.content_type:
             return True
         return self.filetype in {'wav', 'mp3'}
+
+    def is_archive(self):
+        if not self.content_type:
+            return False
+        return self.filetype in {'rar', 'zip'}
 
 
 @dataclass

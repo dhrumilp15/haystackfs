@@ -41,6 +41,26 @@ class Haystackfs(commands.Cog):
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
 
+    # @commands.Cog.listener()
+    # async def on_interaction(self, interaction: discord.Interaction):
+    #     if interaction.type == discord.InteractionType.application_command:
+    #         return
+    #     print(interaction.data)
+    #     if "component_type" not in interaction.data or "custom_id" not in interaction.data:
+    #         return
+    #     component_type = interaction.data["component_type"]
+    #     custom_id = interaction.data["custom_id"]
+    #     if component_type == 2:
+    #         if custom_id == "back_button":
+    #             # implement back
+    #             pass
+    #         else:
+    #             # implement forward
+    #             pass
+    #     else:
+    #         # implement editing the embed
+    #         pass
+
     async def locate(self, interaction: discord.Interaction, query: Query) -> SearchResults:
         """
         Turn arguments into a search and return the files.
@@ -49,7 +69,7 @@ class Haystackfs(commands.Cog):
             interaction: The SlashContext from which the command originated
             query: The user query
 
-        Returns a destination that has a .send method, and a list of files.
+        Returns a destination that has a .send methgod, and a list of files.
         """
         if query.channel and interaction.guild is not None:
             if not query.channel.permissions_for(interaction.guild.me).read_message_history:
@@ -74,7 +94,8 @@ class Haystackfs(commands.Cog):
                 send_source,
                 edit_source,
                 query.dm,
-                search_results
+                search_results,
+                query=query
             )
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
@@ -172,7 +193,7 @@ class Haystackfs(commands.Cog):
             edit_source = await interaction.followup.send(content=SEARCHING_MESSAGE)
         return send_source, edit_source
 
-    async def send_files_as_message(self, mention: str, send_source, edit_source, send: bool, search_results: SearchResults):
+    async def send_files_as_message(self, mention: str, send_source, edit_source, send: bool, search_results: SearchResults, query: Query):
         """
         Send files as a message to ctx.
 
@@ -184,7 +205,7 @@ class Haystackfs(commands.Cog):
         avatar_url = self.bot.user.display_avatar.url
         if len(search_results.files) > 25:
             search_results.files = search_results.files[:25]
-        view = FileView(search_results, search_client=self.search_client)
+        view = FileView(search_results, search_client=self.search_client, query=query)
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
         message = SEARCH_RESULTS_FOUND.format(search_results.files[0].filename)[:100]
         await send_or_edit(
