@@ -41,26 +41,6 @@ class Haystackfs(commands.Cog):
         print(f'{self.bot.user} has connected to Discord!')
         print(f'{self.owner} is my owner!')
 
-    # @commands.Cog.listener()
-    # async def on_interaction(self, interaction: discord.Interaction):
-    #     if interaction.type == discord.InteractionType.application_command:
-    #         return
-    #     print(interaction.data)
-    #     if "component_type" not in interaction.data or "custom_id" not in interaction.data:
-    #         return
-    #     component_type = interaction.data["component_type"]
-    #     custom_id = interaction.data["custom_id"]
-    #     if component_type == 2:
-    #         if custom_id == "back_button":
-    #             # implement back
-    #             pass
-    #         else:
-    #             # implement forward
-    #             pass
-    #     else:
-    #         # implement editing the embed
-    #         pass
-
     async def locate(self, interaction: discord.Interaction, query: Query) -> SearchResults:
         """
         Turn arguments into a search and return the files.
