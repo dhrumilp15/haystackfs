@@ -41,23 +41,22 @@ class DiscordSearcher:
             A list of dicts of files
         """
         async with sem:
-            if len(files) == self.search_result_limit:
-                return
-            messages = onii_chan.history(limit=None, before=query.before, after=query.after)
+            if query.channel_date_map:
+                before_time = query.channel_date_map[onii_chan.id]
+            else:
+                before_time = query.before
+            messages = onii_chan.history(limit=None, before=before_time, after=query.after)
             async for message in messages:
                 if len(files) == self.search_result_limit:
                     channel_date_map[onii_chan.id] = message.created_at
                     break
-                if not message.attachments:
-                    continue
                 for attachment in message.attachments:
                     metadata = SearchResult.from_discord_attachment(message, attachment)
                     if metadata.objectId in self.banned_file_ids or metadata.objectId in file_set:
                         continue
                     if metadata.match_query(query=query, thresh=self.thresh):
-                        if metadata.objectId not in file_set:
-                            file_set.add(metadata.objectId)
-                            files.append(metadata)
+                        file_set.add(metadata.objectId)
+                        files.append(metadata)
 
     async def search(self, onii_chans: List[Union[discord.DMChannel, discord.Guild]],
                      bot_user=None, query: Query = None) -> SearchResults:
@@ -72,15 +71,16 @@ class DiscordSearcher:
         Returns:
             A list of dicts of files.
         """
-        onii_chans = list(filter(lambda chan: chan.permissions_for(bot_user).read_message_history, onii_chans))
+        if query.channel_date_map:
+            onii_chans = list(filter(lambda chan: chan.id in query.channel_date_map, onii_chans))
+        else:
+            onii_chans = list(filter(lambda chan: chan.permissions_for(bot_user).read_message_history, onii_chans))
         files = []
         files_set = set()
-        tasks = []
         # getting files from each channel one at a time is really slow, but
-        channel_date_map = {chan.id: None for chan in onii_chans}
-        sem = asyncio.Semaphore(30)
-        for onii_chan in onii_chans:
-            tasks.append(self.chan_search(onii_chan, query, files, files_set, channel_date_map, sem))
+        channel_date_map = {}
+        sem = asyncio.Semaphore(10)
+        tasks = [self.chan_search(chan, query, files, files_set, channel_date_map, sem) for chan in onii_chans]
         await asyncio.gather(*tasks)
         if query.filename:
             files = sorted(files, reverse=True, key=lambda x: fuzz.ratio(query.filename, x.filename))

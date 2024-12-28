@@ -1,4 +1,3 @@
-import discord
 from ..utils import search_opts
 from .haystack_embed import HaystackEmbed
 
@@ -20,6 +19,7 @@ class HelpEmbed(HaystackEmbed):
                           value="Use `/search` to search for files. Selecting no options retrieves all files.",
                           inline=False)
         super().add_field(name="Delete", value="Use `/delete` to specify files to delete", inline=False)
+        super().add_field(name="Export", value="Use `/export` for a script that will download all matching files!", inline=False)
         super().add_field(name="Search Options", value="Use these to refine your search queries!", inline=False)
         for opt in search_opts:
             super().add_field(name=opt, value=search_opts[opt])

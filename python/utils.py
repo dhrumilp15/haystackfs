@@ -10,6 +10,7 @@ CONTENT_TYPE_CHOICES = sorted([
     dict(name="png", value="image/png"),
     dict(name="image", value="image"),
     dict(name="audio", value="audio"),
+    dict(name="archive", value="zip"),
     dict(name="zip", value="application/zip"),
     dict(name="mp3/m4a", value="audio/mpeg"),
 ], key=lambda x: x['name'])

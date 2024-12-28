@@ -74,7 +74,8 @@ class Haystackfs(commands.Cog):
                 send_source,
                 edit_source,
                 query.dm,
-                search_results
+                search_results,
+                query=query
             )
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
@@ -172,7 +173,7 @@ class Haystackfs(commands.Cog):
             edit_source = await interaction.followup.send(content=SEARCHING_MESSAGE)
         return send_source, edit_source
 
-    async def send_files_as_message(self, mention: str, send_source, edit_source, send: bool, search_results: SearchResults):
+    async def send_files_as_message(self, mention: str, send_source, edit_source, send: bool, search_results: SearchResults, query: Query):
         """
         Send files as a message to ctx.
 
@@ -184,7 +185,7 @@ class Haystackfs(commands.Cog):
         avatar_url = self.bot.user.display_avatar.url
         if len(search_results.files) > 25:
             search_results.files = search_results.files[:25]
-        view = FileView(search_results)
+        view = FileView(search_results, search_client=self.search_client, query=query)
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
         message = SEARCH_RESULTS_FOUND.format(search_results.files[0].filename)[:100]
         await send_or_edit(
