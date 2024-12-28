@@ -15,11 +15,13 @@ class FileView(discord.ui.View):
         super().__init__()
         self.pages = {1: results}
         self.current_page = 1
+        self.last_page = -1
+        query.channel_date_map = results.channel_date_map
         self.query = query
         self.search_client = search_client
         self.dropdown = FileDropDown(results)
         self.back_button = PageBackButton(self)
-        query.channel_date_map = results.channel_date_map
+
         self.next_button = PageNextButton(self)
 
         if len(results.files) <= 5:
@@ -27,7 +29,8 @@ class FileView(discord.ui.View):
                 self.add_item(FileButton(file))
         else:
             self.add_item(self.dropdown)
-        self.add_item(self.next_button)
+        if self.query.channel_date_map:
+            self.add_item(self.next_button)
 
     async def display_current_page(self, interaction: discord.Interaction):
         preview_file = self.pages[self.current_page].files[0]
@@ -37,18 +40,22 @@ class FileView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
 
     async def next_page(self, interaction: discord.Interaction):
-        self.current_page += 1
-        if self.current_page > len(self.pages):
+        if self.current_page == len(self.pages) and self.current_page != self.last_page:
+            self.current_page += 1
             embed = self.build_in_progress_embed(interaction)
-            await interaction.message.edit(embed=embed)
-
+            await interaction.message.edit(embed=embed, view=None)
             search_results = await fsearch(interaction, self.search_client, self.query)
+
             if not search_results.files:
                 self.current_page -= 1
-                # add a message to tell the user that there are no more pages!
             else:
                 self.pages[self.current_page] = search_results
-                self.query.channel_date_map = search_results.channel_date_map
+                if search_results.channel_date_map:
+                    self.query.channel_date_map = search_results.channel_date_map
+
+            if not search_results.files or not search_results.channel_date_map:
+                self.last_page = self.current_page
+
         await self.display_current_page(interaction)
 
     async def previous_page(self, interaction: discord.Interaction):
@@ -92,7 +99,7 @@ class FileView(discord.ui.View):
     def add_views(self):
         self.clear_items()
         self.add_item(self.dropdown)
-        if self.current_page > 0:
+        if self.current_page > 1:
             self.add_item(self.back_button)
-        self.add_item(self.next_button)
-
+        if self.current_page != self.last_page:
+            self.add_item(self.next_button)
