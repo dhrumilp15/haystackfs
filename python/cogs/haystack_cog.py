@@ -49,7 +49,7 @@ class Haystackfs(commands.Cog):
             interaction: The SlashContext from which the command originated
             query: The user query
 
-        Returns a destination that has a .send methgod, and a list of files.
+        Returns a destination that has a .send method, and a list of files.
         """
         if query.channel and interaction.guild is not None:
             if not query.channel.permissions_for(interaction.guild.me).read_message_history:

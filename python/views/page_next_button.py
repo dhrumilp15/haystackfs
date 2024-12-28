@@ -8,5 +8,3 @@ class PageNextButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         await self.fileview.next_page(interaction)
-
-

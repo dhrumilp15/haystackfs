@@ -1,6 +1,4 @@
 """Search for files purely in discord."""
-import os
-
 import discord
 from typing import List, Union
 import asyncio
