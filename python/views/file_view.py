@@ -7,7 +7,6 @@ from ..bot_commands import fsearch
 from ..models.query import Query
 from ..search.discord_searcher import DiscordSearcher
 from ..search.search_models import SearchResults, SearchResult
-import re
 
 
 class FileView(discord.ui.View):
@@ -40,8 +39,9 @@ class FileView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
 
     async def next_page(self, interaction: discord.Interaction):
-        if self.current_page == len(self.pages) and self.current_page != self.last_page:
+        if self.current_page != self.last_page:
             self.current_page += 1
+        if self.current_page > len(self.pages) and self.current_page != self.last_page:
             embed = self.build_in_progress_embed(interaction)
             await interaction.message.edit(embed=embed, view=None)
             search_results = await fsearch(interaction, self.search_client, self.query)
@@ -59,7 +59,7 @@ class FileView(discord.ui.View):
         await self.display_current_page(interaction)
 
     async def previous_page(self, interaction: discord.Interaction):
-        if self.current_page == 0:
+        if self.current_page == 1:
             return
         self.current_page -= 1
         await self.display_current_page(interaction)
