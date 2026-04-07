@@ -3,8 +3,13 @@ from ..search.search_models import SearchResults, SearchResult
 
 
 class FileDropDown(discord.ui.Select):
+    MAX_OPTIONS = 25
+
     def __init__(self, files: SearchResults):
-        self.value_to_name = {self.build_select_value(file): file.filename for file in files.files}
+        self.value_to_name = {
+            self.build_select_value(file): file.filename
+            for file in files.files[:self.MAX_OPTIONS]
+        }
         options = self.produce_options()
         super().__init__(placeholder="Choose your files here!", options=options)
 

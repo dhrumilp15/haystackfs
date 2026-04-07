@@ -70,8 +70,9 @@ class FileView(discord.ui.View):
         embed.clear_fields()
         embed.set_image(url=None)
         embed.title = f"Gathering files for page {self.current_page}..."
-        message_index = embed.footer.text.index("Delivered")
-        footer_text = embed.footer.text[message_index:]
+        footer_text = embed.footer.text or ""
+        message_index = footer_text.find("Delivered")
+        footer_text = footer_text[message_index:] if message_index != -1 else footer_text
         footer_icon_url = embed.footer.icon_url
         embed.set_footer(text=footer_text, icon_url=footer_icon_url)
         return embed
@@ -84,7 +85,7 @@ class FileView(discord.ui.View):
             media_url = f"https://cdn.discordapp.com/attachments/{preview_file.channel_id}/{preview_file.objectId}/{preview_file.filename}"
 
         num_files = len(self.pages[self.current_page].files)
-        embed.title = f"Found {num_files} file{'s' if num_files > 0 else ''}"
+        embed.title = f"Found {num_files} file{'s' if num_files != 1 else ''}"
         embed.clear_fields()
         embed.insert_field_at(index=0, name=preview_file.filename[:256], value=jump_url)
         embed.set_image(url=media_url)

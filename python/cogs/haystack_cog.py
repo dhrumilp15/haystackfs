@@ -86,7 +86,7 @@ class Haystackfs(commands.Cog):
         """Responds to `/export`. Builds a download script for all files matching a query."""
         send_source, edit_source = await self._get_send_and_edit_recipients(interaction=interaction, send=query.dm)
         search_results = await self.locate(interaction=interaction, query=query)
-        if search_results.message:
+        if not search_results.files:
             await interaction.followup.send(content=search_results.message, ephemeral=query.dm)
             return
 
@@ -96,16 +96,17 @@ class Haystackfs(commands.Cog):
         # Restrict to channels that the search returns files for. This is so that the
         # script does not leak the full server channel list every export. This mapping
         # is required so the export script can save files in directories named by the channels.
-        needed_ids = set(f.channel_id for f in search_results.files)
+        needed_ids = set(str(f.channel_id) for f in search_results.files)
         if interaction.guild is None:
             chan = interaction.channel
-            channels = {str(chan.id): sanitize(chan, str(chan.id))}
-            guild_name = sanitize(chan.name, "export")
+            chan_name = getattr(chan, "name", None) or str(chan.id)
+            channels = {str(chan.id): sanitize(chan_name, str(chan.id))}
+            guild_name = sanitize(chan_name, "export")
         else:
             channels = {
                 str(c.id): sanitize(c.name, str(c.id))
                 for c in interaction.guild.channels
-                if c.id in needed_ids
+                if str(c.id) in needed_ids
             }
             guild_name = sanitize(interaction.guild.name, "export")
 
@@ -119,7 +120,7 @@ class Haystackfs(commands.Cog):
                 send_source=send_source,
                 edit_source=edit_source,
                 send=query.dm,
-                content=f"Found {len(search_results.files)} file{'s' if search_results.files else ''}. Run this script to download them.",
+                content=f"Found {len(search_results.files)} file{'s' if len(search_results.files) != 1 else ''}. Run this script to download them.",
                 attachments=[discord.File(export_script, filename=filename)]
             )
 
@@ -137,13 +138,15 @@ class Haystackfs(commands.Cog):
         for file in search_results.files:
             try:
                 onii_chan = self.bot.get_channel(int(file.channel_id))
+                if onii_chan is None:
+                    continue
                 message = await onii_chan.fetch_message(file.message_id)
                 await message.delete()
                 deleted_files.append(file.filename)
             except (discord.Forbidden, discord.errors.NotFound):
                 continue
-        if isinstance(deleted_files, str):
-            await interaction.followup.send(content=deleted_files, ephemeral=True)
+        if not deleted_files:
+            await interaction.followup.send(content="No files were deleted.", ephemeral=True)
             return
         await interaction.followup.send(content=f"Deleted {' '.join(deleted_files)}", ephemeral=True)
 
@@ -169,7 +172,9 @@ class Haystackfs(commands.Cog):
     async def _get_send_and_edit_recipients(interaction, send):
         send_source = interaction.followup
         edit_source = None
-        if not send:
+        if send:
+            send_source = await interaction.user.create_dm()
+        else:
             edit_source = await interaction.followup.send(content=SEARCHING_MESSAGE)
         return send_source, edit_source
 
@@ -183,8 +188,6 @@ class Haystackfs(commands.Cog):
         """
         name = self.bot.user.name
         avatar_url = self.bot.user.display_avatar.url
-        if len(search_results.files) > 25:
-            search_results.files = search_results.files[:25]
         view = FileView(search_results, search_client=self.search_client, query=query)
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
         message = SEARCH_RESULTS_FOUND.format(search_results.files[0].filename)[:100]
