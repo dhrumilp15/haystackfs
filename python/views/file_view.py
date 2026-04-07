@@ -1,106 +1,64 @@
+"""Persistent paginated view for `/search` results.
+
+`FileView` is a thin component carrier — it owns no pagination state. State
+lives in `PaginationStore`, keyed by the `row_id` baked into each component's
+`custom_id`. The view is registered with `bot.add_view(view, message_id=...)`
+so clicks survive bot restarts.
+"""
 import discord
+
 from .file_dropdown import FileDropDown
 from .file_button import FileButton
 from .page_back_button import PageBackButton
 from .page_next_button import PageNextButton
-from ..bot_commands import fsearch
-from ..models.query import Query
-from ..search.discord_searcher import DiscordSearcher
-from ..search.search_models import SearchResults, SearchResult
+from ..search.search_models import SearchResult, SearchResults
 
 
 class FileView(discord.ui.View):
-    def __init__(self, results: SearchResults, search_client: DiscordSearcher, query: Query):
-        super().__init__()
-        self.pages = {1: results}
-        self.current_page = 1
-        self.last_page = -1
-        query.channel_date_map = results.channel_date_map
-        self.query = query
-        self.search_client = search_client
-        self.dropdown = FileDropDown(results)
-        self.back_button = PageBackButton(self)
+    def __init__(self, results: SearchResults, *, row_id: str):
+        super().__init__(timeout=None)
+        self.row_id = row_id
 
-        self.next_button = PageNextButton(self)
-
-        if len(results.files) <= 5:
-            for file in results.files:
+        files = results.files or []
+        if 0 < len(files) <= 5:
+            for file in files:
                 self.add_item(FileButton(file))
         else:
-            self.add_item(self.dropdown)
-        if self.query.channel_date_map:
-            self.add_item(self.next_button)
+            self.add_item(FileDropDown(results, row_id=row_id))
 
-    async def display_current_page(self, interaction: discord.Interaction):
-        preview_file = self.pages[self.current_page].files[0]
-        embed = self.build_embed(preview_file=preview_file, interaction=interaction)
-        self.dropdown = FileDropDown(self.pages[self.current_page])
-        self.add_views()
-        await interaction.message.edit(embed=embed, view=self)
+        # Always include both nav buttons so the View has a stable component
+        # signature for `bot.add_view`. The callbacks ephemerally reply when
+        # the user is at the first or last page.
+        self.add_item(PageBackButton(row_id=row_id))
+        self.add_item(PageNextButton(row_id=row_id))
 
-    async def next_page(self, interaction: discord.Interaction):
-        if self.current_page != self.last_page:
-            self.current_page += 1
-        if self.current_page > len(self.pages) and self.current_page != self.last_page:
-            embed = self.build_in_progress_embed(interaction)
-            await interaction.message.edit(embed=embed, view=None)
-            search_results = await fsearch(interaction, self.search_client, self.query)
 
-            if not search_results.files:
-                self.current_page -= 1
-            else:
-                self.pages[self.current_page] = search_results
-                if search_results.channel_date_map:
-                    self.query.channel_date_map = search_results.channel_date_map
+def build_page_embed(
+    message: discord.Message, results: SearchResults, current_page: int
+) -> discord.Embed:
+    """Mutate the embed currently on `message` to preview the first file of `results`."""
+    embed = message.embeds[0]
+    preview_file: SearchResult = results.files[0]
 
-            if not search_results.files or not search_results.channel_date_map:
-                self.last_page = self.current_page
+    guild_segment = str(message.guild.id) if message.guild is not None else "@me"
+    jump_url = (
+        f"https://discord.com/channels/{guild_segment}/"
+        f"{preview_file.channel_id}/{preview_file.message_id}"
+    )
+    media_url = (
+        f"https://cdn.discordapp.com/attachments/"
+        f"{preview_file.channel_id}/{preview_file.objectId}/{preview_file.filename}"
+    )
 
-        await self.display_current_page(interaction)
+    num_files = len(results.files)
+    embed.title = f"Found {num_files} file{'s' if num_files != 1 else ''}"
+    embed.clear_fields()
+    embed.insert_field_at(index=0, name=preview_file.filename[:256], value=jump_url)
+    embed.set_image(url=media_url)
 
-    async def previous_page(self, interaction: discord.Interaction):
-        if self.current_page == 1:
-            return
-        self.current_page -= 1
-        await self.display_current_page(interaction)
-
-    def build_in_progress_embed(self, interaction: discord.Interaction) -> discord.Embed:
-        message = interaction.message
-        embed = message.embeds[0]
-        embed.clear_fields()
-        embed.set_image(url=None)
-        embed.title = f"Gathering files for page {self.current_page}..."
-        footer_text = embed.footer.text or ""
-        message_index = footer_text.find("Delivered")
-        footer_text = footer_text[message_index:] if message_index != -1 else footer_text
-        footer_icon_url = embed.footer.icon_url
-        embed.set_footer(text=footer_text, icon_url=footer_icon_url)
-        return embed
-
-    def build_embed(self, preview_file: SearchResult, interaction: discord.Interaction) -> discord.Embed:
-        message = interaction.message
-        embed = message.embeds[0]
-        if interaction.guild is not None:
-            jump_url = f"https://discord.com/channels/{interaction.guild.id}/{preview_file.channel_id}/{preview_file.message_id}"
-            media_url = f"https://cdn.discordapp.com/attachments/{preview_file.channel_id}/{preview_file.objectId}/{preview_file.filename}"
-
-        num_files = len(self.pages[self.current_page].files)
-        embed.title = f"Found {num_files} file{'s' if num_files != 1 else ''}"
-        embed.clear_fields()
-        embed.insert_field_at(index=0, name=preview_file.filename[:256], value=jump_url)
-        embed.set_image(url=media_url)
-
-        footer_text = embed.footer.text
-        index = footer_text.find("Delivered")
-        footer_text = footer_text[index:]
-        footer_text = f"Page {self.current_page}, {footer_text}"
-        embed.set_footer(text=footer_text, icon_url=embed.footer.icon_url)
-        return embed
-
-    def add_views(self):
-        self.clear_items()
-        self.add_item(self.dropdown)
-        if self.current_page > 1:
-            self.add_item(self.back_button)
-        if self.current_page != self.last_page:
-            self.add_item(self.next_button)
+    footer_text = embed.footer.text or ""
+    idx = footer_text.find("Delivered")
+    if idx != -1:
+        footer_text = footer_text[idx:]
+    embed.set_footer(text=f"Page {current_page}, {footer_text}", icon_url=embed.footer.icon_url)
+    return embed

@@ -21,9 +21,9 @@ async def increment_command_count(bot: Bot, command_type: str, value: int = None
 
 async def send_or_edit(send_source, edit_source, send: bool, *args, **kwargs):
     if send:
-        await send_source.send(*args, **kwargs)
-    else:
-        await edit_source.edit(*args, **kwargs)
+        return await send_source.send(*args, **kwargs)
+    edited = await edit_source.edit(*args, **kwargs)
+    return edited if edited is not None else edit_source
 
 
 async def post_exception(channel: discord.TextChannel, exc_tb, exc_val, command_type, query):

@@ -1,5 +1,9 @@
 """Cog class."""
-from python.search.discord_searcher import DiscordSearcher
+import io
+import json
+import re
+import hashlib
+
 from python.models.query import Query
 from python.bot_secrets import DB_NAME
 import discord
@@ -8,9 +12,6 @@ from discord.ext import commands
 from python.utils import search_opts, CONTENT_TYPE_CHOICES
 from python.bot_commands import fsearch
 from python.export_template import generate_script
-import io
-import re
-import hashlib
 from python.views.file_view import FileView
 from python.views.file_embed import FileEmbed
 from python.search.search_models import SearchResults
@@ -70,13 +71,15 @@ class Haystackfs(commands.Cog):
             await interaction.followup.send(content=search_results.message, ephemeral=query.dm)
         else:
             await self.send_files_as_message(
-                interaction.user.mention,
+                interaction,
                 send_source,
                 edit_source,
                 query.dm,
                 search_results,
                 query=query
             )
+            if query.dm:
+                await interaction.followup.send(content="Sent to your DMs!", ephemeral=True)
 
     @app_commands.command(name="export", description=EXPORT_COMMAND_DESCRIPTION)
     @app_commands.describe(**search_opts)
@@ -123,6 +126,8 @@ class Haystackfs(commands.Cog):
                 content=f"Found {len(search_results.files)} file{'s' if len(search_results.files) != 1 else ''}. Run this script to download them.",
                 attachments=[discord.File(export_script, filename=filename)]
             )
+        if query.dm:
+            await interaction.followup.send(content="Sent to your DMs!", ephemeral=True)
 
     @app_commands.command(name="delete", description="Delete files AND their respective messages")
     @app_commands.describe(**search_opts)
@@ -178,36 +183,73 @@ class Haystackfs(commands.Cog):
             edit_source = await interaction.followup.send(content=SEARCHING_MESSAGE)
         return send_source, edit_source
 
-    async def send_files_as_message(self, mention: str, send_source, edit_source, send: bool, search_results: SearchResults, query: Query):
-        """
-        Send files as a message to ctx.
+    async def send_files_as_message(
+        self,
+        interaction: discord.Interaction,
+        send_source,
+        edit_source,
+        send: bool,
+        search_results: SearchResults,
+        query: Query,
+    ):
+        """Send paginated `/search` results and persist their pagination state.
 
-        Args:
-            ctx: The originating context.
-            search_results: The files to send to the context.
+        Steps:
+            1. Stash the cursor and serialize the query/initial page.
+            2. INSERT a row in the pagination store to reserve a row_id.
+            3. Build the FileView with that row_id baked into custom_ids.
+            4. Send the message.
+            5. Attach the message_id to the row and register the view persistently.
         """
         name = self.bot.user.name
         avatar_url = self.bot.user.display_avatar.url
-        view = FileView(search_results, search_client=self.search_client, query=query)
+
+        # 1. Serialize state.
+        query.channel_date_map = search_results.channel_date_map
+        query_json = query.to_json()
+        pages_json = json.dumps({"1": search_results.to_dict()})
+
+        # 2. Reserve a row_id BEFORE building the view so custom_ids are stable.
+        row_id = await self.bot.pagination_store.create(
+            user_id=interaction.user.id,
+            channel_id=interaction.channel_id,
+            guild_id=interaction.guild.id if interaction.guild else None,
+            query_json=query_json,
+            pages_json=pages_json,
+        )
+
+        # 3. Build view with row_id.
+        view = FileView(search_results, row_id=row_id)
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
-        message = SEARCH_RESULTS_FOUND.format(search_results.files[0].filename)[:100]
-        await send_or_edit(
+        body = interaction.user.mention + SEARCH_RESULTS_FOUND.format(
+            search_results.files[0].filename
+        )[:100]
+
+        # 4. Send.
+        sent_message = await send_or_edit(
             send_source=send_source,
             edit_source=edit_source,
             send=send,
-            content=mention + message,
+            content=body,
             embed=embed,
-            view=view
+            view=view,
         )
 
+        # 5. Attach message_id and register the view persistently. If something
+        #    goes wrong here, the row exists with message_id IS NULL and the
+        #    vacuum task will sweep it.
+        if sent_message is not None and getattr(sent_message, "id", None) is not None:
+            await self.bot.pagination_store.attach_message(row_id, sent_message.id)
+            self.bot.add_view(view, message_id=sent_message.id)
 
-def setup(bot):
+
+def setup(bot, search_client):
     """
     Set up the bot.
 
     Args:
         bot: The discord bot.
+        search_client: Shared DiscordSearcher constructed in bot.py.
     """
     print(f'In {DB_NAME} mode')
-    searcher = DiscordSearcher()
-    return Haystackfs(bot, searcher)
+    return Haystackfs(bot, search_client)

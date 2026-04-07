@@ -1,4 +1,6 @@
 """Main Bot Controller."""
+import json
+import os
 from python.bot_secrets import DISCORD_TOKEN, TEST_DISCORD_TOKEN, DB_NAME, GUILD_ID
 import logging
 import discord
@@ -11,6 +13,18 @@ from python.messages import RELOAD_DESCRIPTION
 from python.cogs.haystack_cog import setup as haystack_setup
 from python.cogs.admin_cog import setup as admin_setup
 from python.cogs.help_cog import setup as help_setup
+from python.persistence.pagination_store import PaginationStore
+from python.search.discord_searcher import DiscordSearcher
+from python.search.search_models import SearchResults
+from python.views.file_view import FileView
+
+
+DB_PATH = os.environ.get(
+    "HAYSTACK_DB_PATH",
+    "/var/lib/haystackfs/pagination.sqlite3",
+)
+TTL_SECONDS = 24 * 3600
+VACUUM_INTERVAL_SECONDS = 3600
 
 
 # logging
@@ -75,12 +89,51 @@ async def sync(ctx: Context, guilds: Greedy[discord.Object], spec: Optional[Lite
     await ctx.send(f"Synced the tree to {ret}/{len(guilds)}.")
 
 
+async def _vacuum_loop(store: PaginationStore):
+    while True:
+        try:
+            n = await store.vacuum_old(TTL_SECONDS)
+            if n:
+                print(f"[pagination] vacuumed {n} rows")
+        except Exception as e:
+            print(f"[pagination] vacuum failed: {e!r}")
+        await asyncio.sleep(VACUUM_INTERVAL_SECONDS)
+
+
+async def _rehydrate_views(bot: commands.Bot, store: PaginationStore):
+    """Re-register persistent FileViews for every active row at startup."""
+    rows = await store.iter_active(TTL_SECONDS)
+    rehydrated = 0
+    for row in rows:
+        try:
+            pages = json.loads(row["pages_json"])
+            current_results = SearchResults.from_dict(pages[str(row["current_page"])])
+            view = FileView(current_results, row_id=row["row_id"])
+            bot.add_view(view, message_id=row["message_id"])
+            rehydrated += 1
+        except Exception as e:
+            print(f"[pagination] failed to rehydrate row {row['row_id']}: {e!r}")
+    print(f"[pagination] rehydrated {rehydrated} views")
+
+
 if __name__ == "__main__":
     async def main():
-        # Sync commands after loading extensions
         async with bot:
-            await bot.add_cog(haystack_setup(bot))
+            # 1. Construct shared services BEFORE adding cogs.
+            bot.search_client = DiscordSearcher()
+            bot.pagination_store = PaginationStore(DB_PATH)
+            await bot.pagination_store.init()
+
+            # 2. Add cogs (haystack cog now takes the shared search_client).
+            await bot.add_cog(haystack_setup(bot, bot.search_client))
             await bot.add_cog(admin_setup(bot))
             await bot.add_cog(help_setup(bot))
+
+            # 3. Rehydrate persistent views from the store.
+            await _rehydrate_views(bot, bot.pagination_store)
+
+            # 4. Background vacuum.
+            bot._vacuum_task = asyncio.create_task(_vacuum_loop(bot.pagination_store))
+
             await bot.start(TOKEN)
     asyncio.run(main())

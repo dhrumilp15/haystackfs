@@ -1,11 +1,16 @@
 import discord
 
+from .pagination_callbacks import handle_back_click
+
 
 class PageBackButton(discord.ui.Button):
-    def __init__(self, fileview: 'FileView'):
-        super().__init__(style=discord.ButtonStyle.secondary, label="Previous page")
-        self.fileview = fileview
+    def __init__(self, *, row_id: str):
+        super().__init__(
+            style=discord.ButtonStyle.secondary,
+            label="Previous Page",
+            custom_id=f"hfs:back:{row_id}",
+        )
+        self.row_id = row_id
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        await self.fileview.previous_page(interaction)
+        await handle_back_click(interaction, self.row_id)

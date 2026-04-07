@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import List
 from ..models.query import Query
 from thefuzz import fuzz
@@ -95,6 +95,10 @@ class SearchResult:
             return False
         return self.filetype in {'rar', 'zip'}
 
+    @classmethod
+    def from_dict(cls, d: dict) -> 'SearchResult':
+        return cls(**d)
+
 
 @dataclass
 class SearchResults:
@@ -108,3 +112,30 @@ class SearchResults:
         for attachment in message.attachments:
             files.append(SearchResult.from_discord_attachment(message, attachment))
         return SearchResults(files=files)
+
+    def to_dict(self) -> dict:
+        cdm = None
+        if self.channel_date_map:
+            cdm = {
+                k: (v.isoformat() if isinstance(v, datetime) else v)
+                for k, v in self.channel_date_map.items()
+            }
+        return {
+            "files": [asdict(f) for f in (self.files or [])],
+            "message": self.message,
+            "channel_date_map": cdm,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> 'SearchResults':
+        cdm = d.get("channel_date_map")
+        if cdm:
+            cdm = {
+                k: (datetime.fromisoformat(v) if isinstance(v, str) else v)
+                for k, v in cdm.items()
+            }
+        return cls(
+            files=[SearchResult.from_dict(f) for f in (d.get("files") or [])],
+            message=d.get("message", ""),
+            channel_date_map=cdm,
+        )

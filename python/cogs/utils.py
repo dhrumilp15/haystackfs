@@ -29,7 +29,7 @@ def give_signature(real_func):
 			before: str = None,
 			dm: bool = False
 		):
-			await interaction.response.defer()
+			await interaction.response.defer(ephemeral=dm)
 			query = Query(
 				filename=filename,
 				filetype=filetype,
