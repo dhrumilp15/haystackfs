@@ -15,7 +15,25 @@ from ..search.search_models import SearchResult, SearchResults
 
 
 class FileView(discord.ui.View):
-    def __init__(self, results: SearchResults, *, row_id: str):
+    def __init__(
+        self,
+        results: SearchResults,
+        *,
+        row_id: str,
+        current_page: int = 1,
+        last_page: int = 1,
+    ):
+        """Persistent view for one page of search results.
+
+        Pagination buttons are included only when needed:
+            - Back button only when current_page > 1.
+            - Next button only when current_page != last_page (more pages exist
+              or are unknown — last_page == -1 is the "more pages" sentinel).
+            - Neither when current_page == 1 == last_page (single-page result).
+
+        `bot.add_view(view, message_id=...)` is called on every edit, so the
+        registered component shape always matches what's currently on the message.
+        """
         super().__init__(timeout=None)
         self.row_id = row_id
 
@@ -26,11 +44,10 @@ class FileView(discord.ui.View):
         else:
             self.add_item(FileDropDown(results, row_id=row_id))
 
-        # Always include both nav buttons so the View has a stable component
-        # signature for `bot.add_view`. The callbacks ephemerally reply when
-        # the user is at the first or last page.
-        self.add_item(PageBackButton(row_id=row_id))
-        self.add_item(PageNextButton(row_id=row_id))
+        if current_page > 1:
+            self.add_item(PageBackButton(row_id=row_id))
+        if current_page != last_page:
+            self.add_item(PageNextButton(row_id=row_id))
 
 
 def build_page_embed(

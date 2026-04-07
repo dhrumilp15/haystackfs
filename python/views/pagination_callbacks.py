@@ -126,13 +126,21 @@ async def _retreat(interaction, store, row) -> None:
 
 
 async def _rerender(interaction, row_id: str, pages: dict, current: int, last: int) -> None:
-    """Edit the message with a fresh embed + view for the current page."""
+    """Edit the message with a fresh embed + view for the current page.
+
+    The view's component shape (which nav buttons are present) depends on
+    current/last, so we re-register it with the bot after the edit. discord.py's
+    view store keys by message_id, so this replaces the previous registration.
+    """
     from .file_view import FileView, build_page_embed  # lazy to avoid circular import
 
     page_results = SearchResults.from_dict(pages[str(current)])
     embed = build_page_embed(interaction.message, page_results, current)
-    view = FileView(page_results, row_id=row_id)
+    view = FileView(
+        page_results, row_id=row_id, current_page=current, last_page=last,
+    )
     await interaction.message.edit(embed=embed, view=view)
+    interaction.client.add_view(view, message_id=interaction.message.id)
 
 
 def _build_in_progress_embed(message: discord.Message, current_page: int) -> discord.Embed:

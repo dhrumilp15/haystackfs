@@ -108,7 +108,12 @@ async def _rehydrate_views(bot: commands.Bot, store: PaginationStore):
         try:
             pages = json.loads(row["pages_json"])
             current_results = SearchResults.from_dict(pages[str(row["current_page"])])
-            view = FileView(current_results, row_id=row["row_id"])
+            view = FileView(
+                current_results,
+                row_id=row["row_id"],
+                current_page=row["current_page"],
+                last_page=row["last_page"],
+            )
             bot.add_view(view, message_id=row["message_id"])
             rehydrated += 1
         except Exception as e:

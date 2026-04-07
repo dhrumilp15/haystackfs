@@ -209,6 +209,11 @@ class Haystackfs(commands.Cog):
         query_json = query.to_json()
         pages_json = json.dumps({"1": search_results.to_dict()})
 
+        # If there's no cursor, this is the only page that will ever exist —
+        # mark the row as such so neither nav button renders. Otherwise -1 is
+        # the "more pages may exist" sentinel and the Next button shows.
+        initial_last_page = 1 if not search_results.channel_date_map else -1
+
         # 2. Reserve a row_id BEFORE building the view so custom_ids are stable.
         row_id = await self.bot.pagination_store.create(
             user_id=interaction.user.id,
@@ -216,10 +221,16 @@ class Haystackfs(commands.Cog):
             guild_id=interaction.guild.id if interaction.guild else None,
             query_json=query_json,
             pages_json=pages_json,
+            last_page=initial_last_page,
         )
 
-        # 3. Build view with row_id.
-        view = FileView(search_results, row_id=row_id)
+        # 3. Build view with row_id and the resolved nav-button shape.
+        view = FileView(
+            search_results,
+            row_id=row_id,
+            current_page=1,
+            last_page=initial_last_page,
+        )
         embed = FileEmbed(search_results, name=name, avatar_url=avatar_url)
         body = interaction.user.mention + SEARCH_RESULTS_FOUND.format(
             search_results.files[0].filename

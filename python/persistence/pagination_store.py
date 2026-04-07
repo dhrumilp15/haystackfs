@@ -70,6 +70,7 @@ class PaginationStore:
         guild_id: Optional[int],
         query_json: str,
         pages_json: str,
+        last_page: int = -1,
     ) -> str:
         row_id = uuid.uuid4().hex
         now = int(time.time())
@@ -77,8 +78,9 @@ class PaginationStore:
             "INSERT INTO pagination_rows "
             "(row_id, channel_id, guild_id, user_id, query_json, pages_json, "
             "current_page, last_page, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, -1, ?, ?)",
-            (row_id, channel_id, guild_id, user_id, query_json, pages_json, now, now),
+            "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+            (row_id, channel_id, guild_id, user_id, query_json, pages_json,
+             last_page, now, now),
         )
         await self._db.commit()
         return row_id
